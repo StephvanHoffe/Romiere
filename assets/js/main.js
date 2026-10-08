@@ -836,7 +836,7 @@
       current = c.dataset.cat;
       const url = new URL(location.href);
       if (current === "all") url.searchParams.delete("c"); else url.searchParams.set("c", current);
-      history.replaceState(null, "", url);
+      try { history.replaceState(null, "", url); } catch { /* not allowed for file:// pages */ }
       render();
     });
     sortSel.addEventListener("change", render);
