@@ -173,7 +173,7 @@
 
   function renderFooter() {
     const html = `
-      <footer class="ftr t-sand" data-theme="light">
+      <footer class="ftr t-blush" data-theme="light">
         <div class="wrap ftr__top">
           <div class="ftr__news">
             <p class="label accent">Join the Romière community</p>
@@ -995,7 +995,7 @@
           </div>
         </div>
       </section>
-      ${p.meaning ? `<section class="pdp-meaning t-sand" data-theme="light">
+      ${p.meaning ? `<section class="pdp-meaning t-blush" data-theme="light">
           <div class="narrow">
             <p class="label accent" data-reveal>The meaning of ${esc(p.name)}</p>
             <p class="quote" data-reveal data-delay="1">“${displayText(p.meaning)}”</p>
