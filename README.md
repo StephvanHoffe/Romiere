@@ -8,8 +8,8 @@ Een donkere, filmische vormgeving in de stijl van grote juweliershuizen: inkt- e
 
 - **Openingsanimatie** – bij het eerste bezoek wordt het logo op wijnrood "getekend"; daarna opent het doek. Tussen pagina's schuift een wijnrood doek voorbij.
 - **Home** – *Forever Guided* rond een boogvormig beeld met wisselende campagnefoto's, een manifest dat woord voor woord oplicht tijdens het scrollen, de collectie die horizontaal voorbijschuift, *The meaning collection* (de betekenis achter Florea, Éclat en Amour Rouge), een categorie-index met meebewegende beelden, het Romière-ritueel, een statement en een polaroid-wand *Seen on you*.
-- **Collection** (`shop.html?c=…`) – filters (New in, Bestsellers, Necklaces, Bracelets, Earrings, Sets), sortering en redactionele tegels.
-- **Product** (`product.html?p=<slug>`) – galerij met zoom, een vastgezet donker paneel met finish-keuze (goud/zilver) en winkeltas, details & verzorging, de betekenis van het sieraad en bijpassende pieces.
+- **Collection** (`shop.html#…`) – filters (New in, Bestsellers, Necklaces, Bracelets, Earrings, Sets), sortering en redactionele tegels.
+- **Product** (`product.html#<slug>`) – galerij met zoom, een vastgezet donker paneel met finish-keuze (goud/zilver) en winkeltas, details & verzorging, de betekenis van het sieraad en bijpassende pieces.
 - **Story** – vijf hoofdstukken (Chapitre I–V): Forever Guided, Not just a trend, Every detail has a meaning, Craftsmanship & materials, The Signature Edit.
 - **Client care** (`contact.html`) – contactformulier (opent een e-mail aan info@romiere.nl), FAQ, verzending en retourbeleid.
 - **Overal** – volledig scherm menu met beelden, zoeken, winkeltas met teller tot gratis verzending, eigen cursor op desktop en een footer met het logo op volle breedte.

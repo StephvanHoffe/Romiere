@@ -47,7 +47,10 @@
   const params = new URLSearchParams(location.search);
   const bySlug = (slug) => CATALOG.find((p) => p.slug === slug);
   const byId = (id) => CATALOG.find((p) => p.id === id);
-  const productUrl = (p) => `product.html?p=${encodeURIComponent(p.slug)}`;
+  // Routes live in the hash (shop.html#necklaces, product.html#florea-necklace-gold) so they survive
+  // any static host, file:// and embedded previews; ?c= and ?p= links keep working.
+  const route = () => { try { return decodeURIComponent(location.hash.slice(1)); } catch { return ""; } };
+  const productUrl = (p) => `product.html#${encodeURIComponent(p.slug)}`;
   const imgPath = (img, size) => `assets/img/products/${img.base}-${size}.webp`;
   const srcset = (img) => `${imgPath(img, 600)} 600w, ${imgPath(img, 1200)} 1200w`;
   const ed = (name, size = 1200) => `assets/img/editorial/${name}-${size}.webp`;
@@ -74,8 +77,8 @@
   /* ---------- Shared chrome ---------- */
   const MENU = [
     ["I", "The Collection", "shop.html", "necklace-reveal"],
-    ["II", "New in", "shop.html?c=new-in", "earring-portrait"],
-    ["III", "Bestsellers", "shop.html?c=bestsellers", "hands-layered"],
+    ["II", "New in", "shop.html#new-in", "earring-portrait"],
+    ["III", "Bestsellers", "shop.html#bestsellers", "hands-layered"],
     ["IV", "The Story", "story.html", "signature-box"],
     ["V", "Client care", "contact.html", "the-edit"],
   ];
@@ -122,8 +125,8 @@
           </div>
           <div class="menu__foot label">
             <nav aria-label="Categorieën">
-              <a href="shop.html?c=necklaces">Necklaces</a><a href="shop.html?c=bracelets">Bracelets</a>
-              <a href="shop.html?c=earrings">Earrings</a><a href="shop.html?c=sets">Sets</a>
+              <a href="shop.html#necklaces">Necklaces</a><a href="shop.html#bracelets">Bracelets</a>
+              <a href="shop.html#earrings">Earrings</a><a href="shop.html#sets">Sets</a>
             </nav>
             <nav aria-label="Social">
               <a href="${CONFIG.instagram}" target="_blank" rel="noopener">Instagram</a>
@@ -163,6 +166,7 @@
       </aside>
 
       <div class="toast" role="status" aria-live="polite" data-toast></div>
+      ${window.ROMIERE_PREVIEW ? `<p class="preview-badge label">Ontwerpconcept · niet de officiële webshop</p>` : ""}
       <div class="curtain${reduceMotion ? " is-up" : ""}" data-curtain aria-hidden="true"></div>`;
     document.body.insertAdjacentHTML("afterbegin", html);
   }
@@ -185,11 +189,11 @@
             <div>
               <h4 class="label">Collection</h4>
               <ul>
-                <li><a href="shop.html?c=new-in">New in</a></li>
-                <li><a href="shop.html?c=necklaces">Necklaces</a></li>
-                <li><a href="shop.html?c=bracelets">Bracelets</a></li>
-                <li><a href="shop.html?c=earrings">Earrings</a></li>
-                <li><a href="shop.html?c=sets">Sets</a></li>
+                <li><a href="shop.html#new-in">New in</a></li>
+                <li><a href="shop.html#necklaces">Necklaces</a></li>
+                <li><a href="shop.html#bracelets">Bracelets</a></li>
+                <li><a href="shop.html#earrings">Earrings</a></li>
+                <li><a href="shop.html#sets">Sets</a></li>
               </ul>
             </div>
             <div>
@@ -635,7 +639,11 @@
       if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
       const url = new URL(a.href, location.href);
       if (url.origin !== location.origin) return;
-      if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+      if (url.pathname === location.pathname && url.search === location.search && url.hash) {
+        const target = decodeURIComponent(url.hash.slice(1));
+        const toOtherProduct = page === "product" && bySlug(target) && target !== route();
+        if (!toOtherProduct) { closePanel(); return; }
+      }
       e.preventDefault();
       closePanel(true);
       curtain.classList.remove("is-up");
@@ -781,7 +789,8 @@
     const grid = $("[data-shop-grid]");
     const cats = $("[data-cats]");
     const sortSel = $("[data-sort]");
-    let current = CATEGORIES[params.get("c")] ? params.get("c") : "all";
+    const fromUrl = () => [route(), params.get("c")].find((k) => CATEGORIES[k]) || "all";
+    let current = fromUrl();
 
     cats.innerHTML = CATEGORY_ORDER.map((k, i) => `${i ? '<span aria-hidden="true">/</span>' : ""}<button type="button" data-cat="${k}" aria-pressed="${k === current}">${esc(CATEGORIES[k].label)}</button>`).join("");
 
@@ -834,10 +843,13 @@
       const c = e.target.closest("[data-cat]");
       if (!c) return;
       current = c.dataset.cat;
-      const url = new URL(location.href);
-      if (current === "all") url.searchParams.delete("c"); else url.searchParams.set("c", current);
-      try { history.replaceState(null, "", url); } catch { /* not allowed for file:// pages */ }
+      try { history.replaceState(null, "", current === "all" ? location.pathname : `#${current}`); } catch { /* blocked in some sandboxes */ }
       render();
+    });
+    window.addEventListener("hashchange", () => {
+      current = fromUrl();
+      render();
+      window.scrollTo({ top: 0, behavior: "instant" });
     });
     sortSel.addEventListener("change", render);
     render();
@@ -871,7 +883,11 @@
 
   function initProduct() {
     const root = $("[data-pdp]");
-    const p = bySlug(params.get("p"));
+    const p = bySlug(route()) || bySlug(params.get("p"));
+    window.addEventListener("hashchange", () => {
+      const next = bySlug(route());
+      if (next && (!p || next.id !== p.id)) location.reload();
+    });
     if (!p) {
       root.innerHTML = `<section class="notfound t-dark" data-theme="dark">
           <div>
@@ -916,7 +932,7 @@
           <div class="pdp__sticky" data-sticky>
             <nav class="crumbs label" aria-label="Kruimelpad">
               <a href="shop.html">Collection</a><span aria-hidden="true">/</span>
-              ${cat ? `<a href="shop.html?c=${cat}">${esc(CATEGORIES[cat].label)}</a>` : ""}
+              ${cat ? `<a href="shop.html#${cat}">${esc(CATEGORIES[cat].label)}</a>` : ""}
             </nav>
             <p class="label accent">N° ${number} — Forever line</p>
             <h1 class="display pdp__title">${esc(p.name)}</h1>
@@ -975,7 +991,7 @@
               <p class="label accent">Complete the look</p>
               <h2 class="display s-lg" data-split>You may <em>also love</em></h2>
             </div>
-            <a class="uline" href="shop.html${cat ? `?c=${cat}` : ""}">View all ${ICONS.arrow}</a>
+            <a class="uline" href="shop.html${cat ? `#${cat}` : ""}">View all ${ICONS.arrow}</a>
           </div>
           <div class="pieces" data-related></div>
         </div>
@@ -1051,7 +1067,7 @@
       const subject = `${f.subject || "Vraag"}${f.order ? ` — bestelling ${f.order}` : ""}`;
       const body = `${f.message}\n\n${f.name}\n${f.email}${f.order ? `\nBestelnummer: ${f.order}` : ""}`;
       location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      toast("Je e-mailprogramma wordt geopend om het bericht te versturen.");
+      toast(`Je e-mailprogramma wordt geopend. Lukt dat niet? Mail ons op ${CONFIG.email}.`);
     });
   }
 
