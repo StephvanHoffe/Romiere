@@ -3,47 +3,47 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>The Collection — Romière</title>
-  <meta name="description" content="Shop de Romière Forever line: necklaces, bracelets, handjewels, earrings en sets in goud en zilver. Gratis verzending vanaf €60 naar NL, BE en DE.">
-  <meta name="theme-color" content="#510000">
+  <title>Collection — Romière</title>
+  <meta name="description" content="De Romière Forever Collection: necklaces, bracelets, handjewels, earrings en sets in goud en zilver. Gratis verzending vanaf €60 naar NL, BE en DE.">
+  <meta name="theme-color" content="#1d1a18">
   <link rel="icon" type="image/png" href="assets/img/brand/favicon.png">
   <link rel="apple-touch-icon" href="assets/img/brand/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Jost:wght@300;400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..600;1,6..96,400..500&family=Manrope:wght@300;400;500;600&display=swap">
   <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body data-page="shop">
   <main id="main">
-    <section class="page-hero">
-      <div class="container">
-        <p class="eyebrow eyebrow--center" data-shop-eyebrow>Forever line</p>
-        <h1 class="title-xl" data-shop-title>The Collection</h1>
-        <p data-shop-intro>Every piece in the Forever line, designed to be worn now and remembered forever.</p>
+    <section class="shop-hero t-dark" data-theme="dark">
+      <div class="wrap">
+        <p class="label accent" data-shop-eyebrow>The Forever Collection</p>
+        <h1 class="display s-mega"><span data-shop-title>Collection</span><sup data-shop-sup></sup></h1>
+        <div class="shop-hero__row">
+          <p class="body-copy" data-shop-intro>Every piece in the Forever line, designed to be worn now and remembered forever.</p>
+          <nav class="shop-cats" data-cats aria-label="Categorieën"></nav>
+        </div>
       </div>
     </section>
 
-    <div class="shop-toolbar">
-      <div class="container shop-toolbar__inner">
-        <div class="filter-chips" role="group" aria-label="Categorie" data-chips></div>
-        <div class="shop-meta">
-          <span data-count></span>
-          <label>
-            <span class="visually-hidden">Sorteren</span>
-            <select class="select" data-sort>
-              <option value="featured">Featured</option>
-              <option value="price-asc">Price, low to high</option>
-              <option value="price-desc">Price, high to low</option>
-              <option value="name">Name A–Z</option>
-            </select>
-          </label>
-        </div>
+    <div class="shop-bar t-light" data-theme="light">
+      <div class="wrap shop-bar__inner">
+        <span class="serif" data-shop-count></span>
+        <label>
+          <span class="visually-hidden">Sorteren</span>
+          <select class="select" data-sort>
+            <option value="featured">Featured</option>
+            <option value="price-asc">Price, low to high</option>
+            <option value="price-desc">Price, high to low</option>
+            <option value="name">Name A–Z</option>
+          </select>
+        </label>
       </div>
     </div>
 
-    <section class="shop-body">
-      <div class="container">
-        <div class="product-grid" data-shop-grid></div>
+    <section class="shop-body t-light" data-theme="light">
+      <div class="wrap">
+        <div class="pieces" data-shop-grid></div>
       </div>
     </section>
   </main>

@@ -2,25 +2,27 @@
 
 Een nieuwe, exclusieve website voor [romiere.nl](https://romiere.nl): dezelfde producten, prijzen, teksten en huiskleuren, in een high-end vormgeving.
 
-## Pagina's
+## Concept: Maison Romière
 
-| Bestand | Inhoud |
-| --- | --- |
-| `index.html` | Homepage: hero, bestsellers, The Signature Edit, categorieën, statement, new in, gifting, materialen, Instagram, USP's |
-| `shop.html` | Collectie met filters (`?c=new-in`, `bestsellers`, `necklaces`, `bracelets`, `earrings`, `sets`) en sortering |
-| `product.html?p=<slug>` | Productpagina: galerij met lightbox, finish-keuze (goud/zilver), aantal, winkeltas, details, betekenis, gerelateerde producten |
-| `story.html` | The Romière Story, Craftsmanship & materials, The Signature Edit |
-| `contact.html` | Contactformulier (opent een e-mail aan info@romiere.nl), FAQ, verzending en retourbeleid |
+Een donkere, filmische vormgeving in de stijl van grote juweliershuizen: inkt- en wijnrode secties, ivoren "vitrines" in boogvorm voor de sieraden, Bodoni-typografie op modeformaat en ingetogen beweging.
 
-Header, menu's, zoekfunctie, winkeltas (bewaard in de browser), nieuwsbrief en footer worden gedeeld via `assets/js/main.js`.
+- **Openingsanimatie** – bij het eerste bezoek wordt het logo op wijnrood "getekend"; daarna opent het doek. Tussen pagina's schuift een wijnrood doek voorbij.
+- **Home** – *Forever Guided* rond een boogvormig beeld met wisselende campagnefoto's, een manifest dat woord voor woord oplicht tijdens het scrollen, de collectie die horizontaal voorbijschuift, *The meaning collection* (de betekenis achter Florea, Éclat en Amour Rouge), een categorie-index met meebewegende beelden, het Romière-ritueel, een statement en een polaroid-wand *Seen on you*.
+- **Collection** (`shop.html?c=…`) – filters (New in, Bestsellers, Necklaces, Bracelets, Earrings, Sets), sortering en redactionele tegels.
+- **Product** (`product.html?p=<slug>`) – galerij met zoom, een vastgezet donker paneel met finish-keuze (goud/zilver) en winkeltas, details & verzorging, de betekenis van het sieraad en bijpassende pieces.
+- **Story** – vijf hoofdstukken (Chapitre I–V): Forever Guided, Not just a trend, Every detail has a meaning, Craftsmanship & materials, The Signature Edit.
+- **Client care** (`contact.html`) – contactformulier (opent een e-mail aan info@romiere.nl), FAQ, verzending en retourbeleid.
+- **Overal** – volledig scherm menu met beelden, zoeken, winkeltas met teller tot gratis verzending, eigen cursor op desktop en een footer met het logo op volle breedte.
+
+Respecteert `prefers-reduced-motion`: animaties en scroll-effecten worden dan uitgeschakeld.
 
 ## Huisstijl
 
-Kleuren van de huidige site: wijnrood `#510000`, ink `#1d1a18`, crème `#f7f3ee`, zand `#e7ddd2`, goud `#a68159`. Het logo staat in `assets/img/brand/` (transparant, in wijnrood en wit). Typografie: Cormorant Garamond (titels) en Jost (tekst), via Google Fonts.
+Kleuren van de huidige site: wijnrood `#510000`, ink `#1d1a18`, crème `#f7f3ee`, zand `#e7ddd2`, goud `#a68159`. Logo in `assets/img/brand/` (transparant, wijnrood en wit). Typografie: Bodoni Moda (titels) en Manrope (tekst), via Google Fonts.
 
 ## Producten
 
-`assets/js/catalog.js` bevat de 31 producten uit de huidige webshop (naam, prijs, voorraad, categorieën, goud/zilver-opties, beschrijving, details en betekenis). Productfoto's staan als WebP in `assets/img/products/` (600 px en 1200 px).
+`assets/js/catalog.js` bevat de 31 producten uit de huidige webshop (naam, prijs, voorraad, categorieën, goud/zilver-opties, beschrijving, details en betekenis). Productfoto's staan als WebP in `assets/img/products/` (600 px en 1200 px); campagnebeelden en polaroids in `assets/img/editorial/`.
 
 ## Lokaal bekijken
 

@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Romière — shared site behaviour
-   Header, menus, search, shopping bag, product rendering and page logic.
+   Romière — Maison
+   Shared chrome (header, menu, search, bag, footer), motion and page logic.
    ========================================================================== */
 (() => {
   "use strict";
@@ -15,21 +15,22 @@
     tiktok: "https://www.tiktok.com/@romiere.official",
   };
   const BAG_KEY = "romiere-bag-v1";
+  const LOADER_KEY = "romiere-intro-seen";
 
   const CATEGORIES = {
-    all: { label: "All", title: "The Collection", eyebrow: "Forever line",
+    all: { label: "All", title: "Collection", eyebrow: "The Forever Collection",
       intro: "Every piece in the Forever line, designed to be worn now and remembered forever." },
     "new-in": { label: "New in", title: "New in", eyebrow: "Just arrived",
       intro: "The latest additions to the Forever line. Fresh signatures, made to be noticed." },
     bestsellers: { label: "Bestsellers", title: "Bestsellers", eyebrow: "Loved by you",
       intro: "Our most-loved jewellery, chosen time and again by the Romière community." },
-    necklaces: { label: "Necklaces", title: "Necklaces", eyebrow: "The collection",
+    necklaces: { label: "Necklaces", title: "Necklaces", eyebrow: "The Forever Collection", singular: "Necklace",
       intro: "Delicate chains, luminous pearls and zirconia that catch the light with every movement." },
-    bracelets: { label: "Bracelets", title: "Bracelets & Handjewels", eyebrow: "The collection",
+    bracelets: { label: "Bracelets", title: "Bracelets", eyebrow: "Bracelets & handjewels", singular: "Bracelet",
       intro: "Fine chains that frame the wrist and hand with a quiet, unmistakable sparkle." },
-    earrings: { label: "Earrings", title: "Earrings", eyebrow: "The collection",
+    earrings: { label: "Earrings", title: "Earrings", eyebrow: "The Forever Collection", singular: "Earrings",
       intro: "From freshwater pearl studs to radiant florals: the finishing touch to every look." },
-    sets: { label: "Sets", title: "Sets", eyebrow: "Thoughtfully paired",
+    sets: { label: "Sets", title: "Sets", eyebrow: "Thoughtfully paired", singular: "Set",
       intro: "Matching pieces, made to be worn together. The perfect gift, for someone else or yourself." },
   };
   const CATEGORY_ORDER = ["all", "new-in", "bestsellers", "necklaces", "bracelets", "earrings", "sets"];
@@ -40,185 +41,149 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const money = (cents) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(cents / 100);
   const fold = (s) => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  // Bodoni's em dash becomes an invisible hairline at display sizes; use the en dash there.
+  const displayText = (s) => esc(s).replace(/\u2014/g, "\u2013");
   const params = new URLSearchParams(location.search);
   const bySlug = (slug) => CATALOG.find((p) => p.slug === slug);
   const byId = (id) => CATALOG.find((p) => p.id === id);
   const productUrl = (p) => `product.html?p=${encodeURIComponent(p.slug)}`;
   const imgPath = (img, size) => `assets/img/products/${img.base}-${size}.webp`;
   const srcset = (img) => `${imgPath(img, 600)} 600w, ${imgPath(img, 1200)} 1200w`;
+  const ed = (name, size = 1200) => `assets/img/editorial/${name}-${size}.webp`;
   const page = document.body.dataset.page || "";
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finePointer = matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const storage = {
+    get(store, k) { try { return window[store].getItem(k); } catch { return null; } },
+    set(store, k, v) { try { window[store].setItem(k, v); } catch { /* unavailable */ } },
+  };
 
   const ICONS = {
+    arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h17M14 6l6 6-6 6"/></svg>',
+    down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v17M6 14l6 6 6-6"/></svg>',
     search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>',
-    bag: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l-1.2 12.2a1 1 0 0 1-1 .8H7.2a1 1 0 0 1-1-.8L5 8z"/><path d="M9 10V6.5a3 3 0 0 1 6 0V10"/></svg>',
-    menu: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 12h12M3 17h18"/></svg>',
-    close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>',
     prev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
     next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
-    arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h15M13 6l6 6-6 6"/></svg>',
-    star: '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0l1.2 3.8L10 5 6.2 6.2 5 10 3.8 6.2 0 5l3.8-1.2z" fill="currentColor"/></svg>',
     gift: '<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="12" width="22" height="15"/><path d="M3 8h26v4H3zM16 8v19M16 8c-2-4-7-5-7-2s4 2 7 2c3 0 7 1 7-2s-5-2-7 2"/></svg>',
     truck: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M3 8h16v14H3zM19 13h6l4 5v4H19z"/><circle cx="9" cy="24" r="2.5"/><circle cx="24" cy="24" r="2.5"/></svg>',
     shield: '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l11 4v8c0 7-5 12-11 14C10 27 5 22 5 15V7z"/><path d="M11 16l3.5 3.5L21 13"/></svg>',
     clock: '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12"/><path d="M16 9v7l5 3"/></svg>',
-    instagram: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M7 2h10a5 5 0 0 1 5 5v10a5 5 0 0 1-5 5H7a5 5 0 0 1-5-5V7a5 5 0 0 1 5-5zm0 1.8A3.2 3.2 0 0 0 3.8 7v10A3.2 3.2 0 0 0 7 20.2h10a3.2 3.2 0 0 0 3.2-3.2V7A3.2 3.2 0 0 0 17 3.8zm5 3.7a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 1.8a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4zm5.3-3.7a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z"/></svg>',
-    tiktok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.6 5.8A4.3 4.3 0 0 1 15.5 3h-3.1v12.4a2.6 2.6 0 1 1-2.6-2.6c.3 0 .5 0 .8.1V9.7a5.7 5.7 0 1 0 4.9 5.7V9.1a7.3 7.3 0 0 0 4.3 1.4V7.4a4.3 4.3 0 0 1-3.2-1.6z"/></svg>',
   };
 
   /* ---------- Shared chrome ---------- */
-  const ANNOUNCEMENTS = [
-    "Complimentary shipping from €\u00a060 · NL, BE & DE",
-    "Signature gift box included with every order",
-    "Order before 23:00, shipped the next day",
-    "180-day quality guarantee",
+  const MENU = [
+    ["I", "The Collection", "shop.html", "necklace-reveal"],
+    ["II", "New in", "shop.html?c=new-in", "earring-portrait"],
+    ["III", "Bestsellers", "shop.html?c=bestsellers", "hands-layered"],
+    ["IV", "The Story", "story.html", "signature-box"],
+    ["V", "Client care", "contact.html", "the-edit"],
   ];
 
-  function renderMasthead() {
-    const navCurrent = (key) => (page === key ? ' aria-current="page"' : "");
+  function renderChrome() {
     const html = `
       <a class="skip-link" href="#main">Naar de inhoud</a>
-      <div class="masthead" data-masthead>
-        <div class="announcement" role="region" aria-label="Service">
-          ${ANNOUNCEMENTS.map((a, i) => `<p class="announcement__item${i === 0 ? " is-active" : ""}">${esc(a)}</p>`).join("")}
-        </div>
-        <header class="site-header">
-          <div class="container header-inner">
-            <div class="header-left">
-              <button class="icon-btn menu-toggle" type="button" aria-label="Open menu" data-open-menu>${ICONS.menu}</button>
-              <nav class="main-nav" aria-label="Hoofdmenu">
-                <ul>
-                  <li class="has-mega">
-                    <a class="nav-link" href="shop.html"${navCurrent("shop")}>Shop</a>
-                    <div class="mega">
-                      <div class="container mega__inner">
-                        <div>
-                          <h4>Jewellery</h4>
-                          <ul>
-                            <li><a href="shop.html?c=necklaces">Necklaces</a></li>
-                            <li><a href="shop.html?c=bracelets">Bracelets &amp; Handjewels</a></li>
-                            <li><a href="shop.html?c=earrings">Earrings</a></li>
-                            <li><a href="shop.html?c=sets">Sets</a></li>
-                          </ul>
-                        </div>
-                        <div>
-                          <h4>Discover</h4>
-                          <ul>
-                            <li><a href="shop.html?c=new-in">New in</a></li>
-                            <li><a href="shop.html?c=bestsellers">Bestsellers</a></li>
-                            <li><a href="shop.html">The Forever line</a></li>
-                            <li><a href="shop.html?c=sets">Gifts</a></li>
-                          </ul>
-                        </div>
-                        <a class="mega__feature" href="story.html">
-                          <img src="assets/img/editorial/necklace-reveal-1200.webp" alt="" loading="lazy">
-                          <span>The Romière Story</span>
-                        </a>
-                      </div>
-                    </div>
-                  </li>
-                  <li><a class="nav-link" href="shop.html?c=new-in">New in</a></li>
-                  <li class="hide-lg"><a class="nav-link" href="shop.html?c=bestsellers">Bestsellers</a></li>
-                  <li><a class="nav-link" href="story.html"${navCurrent("story")}>Our story</a></li>
-                </ul>
-              </nav>
-            </div>
-            <a class="header-logo" href="index.html" aria-label="Romière — home">
-              <img class="logo-dark" src="assets/img/brand/romiere-logo.png" alt="Romière" width="1000" height="341">
-              <img class="logo-light" src="assets/img/brand/romiere-logo-white.png" alt="" width="1000" height="341" aria-hidden="true">
-            </a>
-            <div class="header-tools">
-              <a class="nav-link nav-text" href="contact.html"${navCurrent("contact")}>Contact</a>
-              <button class="icon-btn" type="button" data-open-search aria-label="Zoeken">${ICONS.search}<span class="nav-text hide-lg">Search</span></button>
-              <button class="icon-btn" type="button" data-open-bag aria-label="Winkeltas">${ICONS.bag}<span class="bag-count" data-bag-count>0</span></button>
-            </div>
+      <header class="hdr on-dark" data-hdr>
+        <div class="wrap hdr__inner">
+          <div class="hdr__side">
+            <button class="hdr__btn" type="button" data-open="menu" aria-label="Open menu">
+              <span class="burger" aria-hidden="true"><i></i><i></i></span><span class="label hide-sm">Menu</span>
+            </button>
+            <a class="hdr__btn label hide-sm" href="shop.html">Collection</a>
           </div>
-        </header>
+          <a class="hdr__logo" href="index.html" aria-label="Romière — home">
+            <img class="logo-ivory" src="assets/img/brand/romiere-logo-white.png" alt="Romière" width="1000" height="341">
+            <img class="logo-ink" src="assets/img/brand/romiere-logo.png" alt="" aria-hidden="true" width="1000" height="341">
+          </a>
+          <div class="hdr__side hdr__side--right">
+            <button class="hdr__btn label hide-sm" type="button" data-open="search">Search</button>
+            <button class="hdr__btn hdr__icon" type="button" data-open="search" aria-label="Zoeken">${ICONS.search}</button>
+            <button class="hdr__btn label" type="button" data-open="bag">Bag<sup data-bag-count>0</sup></button>
+          </div>
+        </div>
+      </header>
+
+      <div class="menu" data-panel="menu" role="dialog" aria-modal="true" aria-label="Menu" aria-hidden="true">
+        <div class="menu__inner">
+          <div class="menu__top">
+            <img src="assets/img/brand/romiere-logo-white.png" alt="Romière">
+            <button class="close-x label" type="button" data-close>Close <i aria-hidden="true"></i></button>
+          </div>
+          <nav class="menu__nav" aria-label="Hoofdmenu">
+            ${MENU.map(([n, label, href, img], i) => `
+              <a class="menu__item" href="${href}" data-menu-img="${img}" style="--i:${i}">
+                <span class="roman">${n}.</span><span class="menu__word">${esc(label)}</span>
+              </a>`).join("")}
+          </nav>
+          <div class="menu__side" aria-hidden="true">
+            <figure class="menu__visual">
+              ${MENU.map(([, , , img], i) => `<img src="${ed(img)}" alt="" data-img="${img}" class="${i === 0 ? "is-active" : ""}" loading="lazy">`).join("")}
+            </figure>
+          </div>
+          <div class="menu__foot label">
+            <nav aria-label="Categorieën">
+              <a href="shop.html?c=necklaces">Necklaces</a><a href="shop.html?c=bracelets">Bracelets</a>
+              <a href="shop.html?c=earrings">Earrings</a><a href="shop.html?c=sets">Sets</a>
+            </nav>
+            <nav aria-label="Social">
+              <a href="${CONFIG.instagram}" target="_blank" rel="noopener">Instagram</a>
+              <a href="${CONFIG.tiktok}" target="_blank" rel="noopener">TikTok</a>
+              <a href="mailto:${CONFIG.email}">${CONFIG.email}</a>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="search t-dark" data-panel="search" role="dialog" aria-modal="true" aria-label="Zoeken" aria-hidden="true">
+        <div class="wrap">
+          <div class="search__top">
+            <span class="label accent">Search the collection</span>
+            <button class="close-x label" type="button" data-close>Close <i aria-hidden="true"></i></button>
+          </div>
+          <label class="search__field">
+            <span class="visually-hidden">Zoek een sieraad</span>
+            <input type="search" placeholder="Pearl, Florea, handjewel…" autocomplete="off" data-search-input>
+          </label>
+          <div class="search__suggest label">
+            ${["Pearl", "Florea", "Handjewel", "Clover", "Éclat", "Star"].map((s) => `<button type="button" data-suggest="${esc(s)}">${esc(s)}</button>`).join("")}
+          </div>
+          <div class="search__results" data-search-results></div>
+        </div>
       </div>
 
       <div class="scrim" data-scrim></div>
-
-      <aside class="mobile-menu" data-menu aria-label="Menu" aria-hidden="true">
-        <div class="mobile-menu__top">
-          <img src="assets/img/brand/romiere-logo.png" alt="Romière">
-          <button class="close-btn" type="button" data-close aria-label="Sluit menu">${ICONS.close}</button>
-        </div>
-        <nav>
-          <a href="shop.html">Shop all</a>
-          <a href="shop.html?c=new-in">New in</a>
-          <a href="shop.html?c=necklaces">Necklaces</a>
-          <a href="shop.html?c=bracelets">Bracelets</a>
-          <a href="shop.html?c=earrings">Earrings</a>
-          <a href="shop.html?c=sets">Sets</a>
-        </nav>
-        <div class="mobile-menu__sub">
-          <a href="shop.html?c=bestsellers">Bestsellers</a>
-          <a href="story.html">Our story</a>
-          <a href="contact.html">Contact</a>
-          <a href="${CONFIG.instagram}" target="_blank" rel="noopener">Instagram</a>
-        </div>
-        <img class="mobile-menu__sign" src="assets/img/brand/forever-guided-signature.png" alt="Forever Guided, Forever Romière.">
-      </aside>
-
-      <div class="search-panel" data-search aria-hidden="true" role="dialog" aria-label="Zoeken">
-        <div class="container">
-          <div class="search-panel__top">
-            <label class="search-field">
-              ${ICONS.search}
-              <span class="visually-hidden">Zoek een sieraad</span>
-              <input type="search" placeholder="Search the collection" autocomplete="off" data-search-input>
-            </label>
-            <button class="close-btn" type="button" data-close aria-label="Sluit zoeken">${ICONS.close}</button>
-          </div>
-          <div class="search-suggest">
-            <span>Popular:</span>
-            ${["Pearl", "Florea", "Handjewel", "Clover", "Éclat"].map((s) => `<button type="button" data-suggest="${esc(s)}">${esc(s)}</button>`).join("")}
-          </div>
-          <div data-search-results></div>
-        </div>
-      </div>
-
-      <aside class="drawer" data-bag aria-hidden="true" role="dialog" aria-label="Winkeltas">
+      <aside class="drawer" data-panel="bag" role="dialog" aria-modal="true" aria-label="Winkeltas" aria-hidden="true">
         <div class="drawer__head">
-          <h2>Your bag <small data-bag-items></small></h2>
-          <button class="close-btn" type="button" data-close aria-label="Sluit winkeltas">${ICONS.close}</button>
+          <h2>Your selection<sup data-bag-items></sup></h2>
+          <button class="close-x label" type="button" data-close>Close <i aria-hidden="true"></i></button>
         </div>
-        <div class="shipping-meter" data-shipping-meter></div>
+        <div class="meter" data-meter></div>
         <div class="drawer__body" data-bag-body></div>
         <div class="drawer__foot" data-bag-foot></div>
       </aside>
 
-      <div class="toast" role="status" aria-live="polite" data-toast></div>`;
+      <div class="toast" role="status" aria-live="polite" data-toast></div>
+      <div class="curtain${reduceMotion ? " is-up" : ""}" data-curtain aria-hidden="true"></div>`;
     document.body.insertAdjacentHTML("afterbegin", html);
   }
 
   function renderFooter() {
     const html = `
-      <section class="newsletter" aria-labelledby="newsletter-title">
-        <div class="container--narrow">
-          <p class="eyebrow eyebrow--center">Join the Romière community</p>
-          <h2 class="title-lg" id="newsletter-title">A little sparkle <em>in your inbox</em></h2>
-          <p>Ontvang als eerste nieuwe collecties, stylingtips en exclusieve aanbiedingen.</p>
-          <form class="newsletter-form" data-newsletter novalidate>
-            <label class="visually-hidden" for="nl-email">E-mailadres</label>
-            <input id="nl-email" type="email" name="email" placeholder="E-mailadres" required autocomplete="email">
-            <button type="submit">Inschrijven</button>
-          </form>
-          <small>Je kunt je op ieder moment weer uitschrijven.</small>
-        </div>
-      </section>
-      <footer class="site-footer">
-        <div class="container">
-          <div class="footer-top">
-            <div class="footer-brand">
-              <img src="assets/img/brand/romiere-logo-white.png" alt="Romière" loading="lazy">
-              <p>Created for those who don't follow trends, they set them. Jewellery for confidence, elegance and individuality.</p>
-              <div class="footer-social">
-                <a href="${CONFIG.instagram}" target="_blank" rel="noopener" aria-label="Instagram">${ICONS.instagram}</a>
-                <a href="${CONFIG.tiktok}" target="_blank" rel="noopener" aria-label="TikTok">${ICONS.tiktok}</a>
-              </div>
-            </div>
+      <footer class="ftr t-wine" data-theme="dark">
+        <div class="wrap ftr__top">
+          <div class="ftr__news">
+            <p class="label accent">Join the Romière community</p>
+            <h2 class="display s-lg" data-split>A little sparkle <em>in your inbox</em></h2>
+            <form class="news" data-newsletter novalidate>
+              <label class="visually-hidden" for="nl-email">E-mailadres</label>
+              <input id="nl-email" type="email" name="email" placeholder="Your e-mail address" required autocomplete="email">
+              <button type="submit" aria-label="Inschrijven">${ICONS.arrow}</button>
+            </form>
+            <small>Ontvang als eerste nieuwe collecties, stylingtips en exclusieve aanbiedingen.</small>
+          </div>
+          <div class="ftr__cols">
             <div>
-              <h4>Shop</h4>
+              <h4 class="label">Collection</h4>
               <ul>
                 <li><a href="shop.html?c=new-in">New in</a></li>
                 <li><a href="shop.html?c=necklaces">Necklaces</a></li>
@@ -228,120 +193,116 @@
               </ul>
             </div>
             <div>
-              <h4>Romière</h4>
+              <h4 class="label">Romière</h4>
               <ul>
-                <li><a href="story.html">The Romière story</a></li>
-                <li><a href="story.html#craftsmanship">Craftsmanship &amp; materials</a></li>
-                <li><a href="story.html#signature-edit">Find your signature piece</a></li>
-                <li><a href="${CONFIG.instagram}" target="_blank" rel="noopener">@romiere.official</a></li>
+                <li><a href="story.html">The story</a></li>
+                <li><a href="story.html#craftsmanship">Craftsmanship</a></li>
+                <li><a href="story.html#signature-edit">Signature Edit</a></li>
+                <li><a href="${CONFIG.instagram}" target="_blank" rel="noopener">Instagram</a></li>
+                <li><a href="${CONFIG.tiktok}" target="_blank" rel="noopener">TikTok</a></li>
               </ul>
             </div>
             <div>
-              <h4>Customer care</h4>
+              <h4 class="label">Client care</h4>
               <ul>
                 <li><a href="contact.html">Contact</a></li>
                 <li><a href="contact.html#faq">FAQ</a></li>
-                <li><a href="contact.html#shipping">Shipping &amp; delivery</a></li>
+                <li><a href="contact.html#shipping">Shipping</a></li>
                 <li><a href="contact.html#returns">Returns</a></li>
                 <li><a href="mailto:${CONFIG.email}">${CONFIG.email}</a></li>
               </ul>
             </div>
           </div>
-          <div class="footer-sign">
-            <img src="assets/img/brand/forever-guided-signature-white.png" alt="Forever Guided, Forever Romière." loading="lazy">
-          </div>
-          <div class="footer-bottom">
-            <span>© ${new Date().getFullYear()} Romière. All rights reserved.</span>
-            <div class="payments" aria-label="Betaalmethoden"><span>iDEAL</span><span>Bancontact</span><span>Klarna</span><span>Secure checkout</span></div>
-          </div>
+        </div>
+        <div class="wrap ftr__service label">
+          <span>Complimentary shipping from €&nbsp;60</span>
+          <span>Signature gift box</span>
+          <span>180-day guarantee</span>
+          <span>Ordered before 23:00, shipped next day</span>
+        </div>
+        <div class="ftr__logo"><img src="assets/img/brand/romiere-logo-white.png" alt="Romière" loading="lazy" data-reveal></div>
+        <div class="wrap ftr__bottom">
+          <span>© ${new Date().getFullYear()} Romière. All rights reserved.</span>
+          <nav aria-label="Betaalmethoden en social">
+            <span>iDEAL · Bancontact · Klarna</span>
+            <a href="contact.html#returns">Returns</a>
+            <a href="${CONFIG.instagram}" target="_blank" rel="noopener">@romiere.official</a>
+          </nav>
         </div>
       </footer>`;
-    document.body.insertAdjacentHTML("beforeend", html);
+    const main = $("#main");
+    main.insertAdjacentHTML("afterend", html);
   }
 
-  /* ---------- Overlay management ---------- */
-  let openPanel = null;
-  function openOverlay(el) {
-    if (openPanel && openPanel !== el) closeOverlay(true);
-    openPanel = el;
+  /* ---------- Overlays ---------- */
+  let openKey = null;
+  let lastFocus = null;
+  function openPanel(key) {
+    if (openKey) closePanel(true);
+    const el = $(`[data-panel="${key}"]`);
+    if (!el) return;
+    lastFocus = document.activeElement;
+    openKey = key;
     el.classList.add("is-open");
     el.setAttribute("aria-hidden", "false");
-    $("[data-scrim]").classList.add("is-visible");
+    if (key === "bag") $("[data-scrim]").classList.add("is-on");
     document.body.classList.add("is-locked");
-    const focusable = el.querySelector("input, button, a");
-    setTimeout(() => focusable && focusable.focus({ preventScroll: true }), 80);
+    hdr.classList.remove("is-hidden");
+    const focusTarget = key === "search" ? $("[data-search-input]") : $("[data-close]", el);
+    setTimeout(() => focusTarget && focusTarget.focus({ preventScroll: true }), 120);
   }
-  function closeOverlay(keepScrim) {
-    if (!openPanel) return;
-    openPanel.classList.remove("is-open");
-    openPanel.setAttribute("aria-hidden", "true");
-    openPanel = null;
-    if (!keepScrim) {
-      $("[data-scrim]").classList.remove("is-visible");
+  function closePanel(silent) {
+    if (!openKey) return;
+    const el = $(`[data-panel="${openKey}"]`);
+    el.classList.remove("is-open");
+    el.setAttribute("aria-hidden", "true");
+    $("[data-scrim]").classList.remove("is-on");
+    openKey = null;
+    if (!silent) {
       document.body.classList.remove("is-locked");
+      if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true });
     }
   }
 
-  function bindChrome() {
-    const masthead = $("[data-masthead]");
-    const hasHero = document.body.classList.contains("has-hero");
-    let hovering = false;
-    const onScroll = () => {
-      const y = window.scrollY;
-      masthead.classList.toggle("is-scrolled", y > 24);
-      const solid = !hasHero || hovering || y > window.innerHeight * 0.75 - 120;
-      masthead.classList.toggle("is-solid", solid);
-    };
-    masthead.addEventListener("mouseenter", () => { hovering = true; onScroll(); });
-    masthead.addEventListener("mouseleave", () => { hovering = false; onScroll(); });
-    masthead.addEventListener("focusin", () => { hovering = true; onScroll(); });
-    masthead.addEventListener("focusout", () => { hovering = false; onScroll(); });
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-
-    // Rotating announcements
-    const items = $$(".announcement__item");
-    let idx = 0;
-    if (items.length > 1 && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setInterval(() => {
-        items[idx].classList.remove("is-active");
-        idx = (idx + 1) % items.length;
-        items[idx].classList.add("is-active");
-      }, 4500);
-    }
-
+  function bindOverlays() {
     document.addEventListener("click", (e) => {
-      const t = e.target.closest("[data-open-menu],[data-open-search],[data-open-bag],[data-close],[data-scrim]");
-      if (!t) return;
-      if (t.hasAttribute("data-open-menu")) openOverlay($("[data-menu]"));
-      else if (t.hasAttribute("data-open-search")) openOverlay($("[data-search]"));
-      else if (t.hasAttribute("data-open-bag")) { renderBag(); openOverlay($("[data-bag]")); }
-      else closeOverlay();
+      const opener = e.target.closest("[data-open]");
+      if (opener) {
+        if (opener.dataset.open === "bag") renderBag();
+        openPanel(opener.dataset.open);
+        return;
+      }
+      if (e.target.closest("[data-close]") || e.target.closest("[data-scrim]")) closePanel();
     });
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") { closeOverlay(); closeLightbox(); }
+      if (e.key === "Escape") { closePanel(); closeLightbox(); }
     });
+
+    // Menu: image follows the hovered chapter
+    $$(".menu__item").forEach((item) => item.addEventListener("mouseenter", () => {
+      $$(".menu__visual img").forEach((img) => img.classList.toggle("is-active", img.dataset.img === item.dataset.menuImg));
+    }));
 
     // Search
     const input = $("[data-search-input]");
     const results = $("[data-search-results]");
-    const runSearch = () => {
+    const run = () => {
       const q = fold(input.value.trim());
       if (!q) { results.innerHTML = ""; return; }
       const hits = CATALOG.filter((p) => fold([p.name, p.categories.join(" "), p.tagline, p.details.join(" ")].join(" ")).includes(q));
       results.innerHTML = hits.length
-        ? `<div class="search-results">${hits.map((p) => cardHTML(p, { compact: true })).join("")}</div>`
-        : `<p class="search-empty">Geen sieraden gevonden voor “${esc(input.value)}”.</p>`;
+        ? `<p class="label accent" style="margin:0 0 48px">${hits.length} ${hits.length === 1 ? "piece" : "pieces"}</p>
+           <div class="pieces">${hits.map((p) => pieceHTML(p, { compact: true })).join("")}</div>`
+        : `<p class="search__empty">Geen sieraden gevonden voor “${esc(input.value)}”.</p>`;
     };
-    input.addEventListener("input", runSearch);
-    $$("[data-suggest]").forEach((b) => b.addEventListener("click", () => { input.value = b.dataset.suggest; runSearch(); input.focus(); }));
+    input.addEventListener("input", run);
+    $$("[data-suggest]").forEach((b) => b.addEventListener("click", () => { input.value = b.dataset.suggest; run(); input.focus(); }));
 
     // Newsletter (front-end only until connected to a mailing tool)
     $$("[data-newsletter]").forEach((form) => form.addEventListener("submit", (e) => {
       e.preventDefault();
-      const email = form.email.value.trim();
-      if (!/^\S+@\S+\.\S+$/.test(email)) { form.email.focus(); toast("Vul een geldig e-mailadres in."); return; }
-      form.outerHTML = `<p class="newsletter__done">Welcome to the Romière community.</p>`;
+      if (!/^\S+@\S+\.\S+$/.test(form.email.value.trim())) { form.email.focus(); toast("Vul een geldig e-mailadres in."); return; }
+      form.outerHTML = `<p class="news-done">Welcome to the Romière community.</p>`;
     }));
   }
 
@@ -350,28 +311,19 @@
   function toast(msg) {
     const el = $("[data-toast]");
     el.textContent = msg;
-    el.classList.add("is-visible");
+    el.classList.add("is-on");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove("is-visible"), 3200);
+    toastTimer = setTimeout(() => el.classList.remove("is-on"), 3400);
   }
 
   /* ---------- Bag ---------- */
   const readBag = () => {
-    try { return JSON.parse(localStorage.getItem(BAG_KEY)) || []; } catch { return []; }
-  };
-  const writeBag = (items) => {
-    try { localStorage.setItem(BAG_KEY, JSON.stringify(items)); } catch { /* storage unavailable */ }
-    updateBagCount(items);
+    try { return JSON.parse(storage.get("localStorage", BAG_KEY)) || []; } catch { return []; }
   };
   let bag = readBag().filter((i) => byId(i.id));
-
-  function updateBagCount(items = bag, bump = false) {
-    const count = items.reduce((n, i) => n + i.qty, 0);
-    $$("[data-bag-count]").forEach((el) => {
-      el.textContent = count;
-      if (bump) { el.classList.add("is-bump"); setTimeout(() => el.classList.remove("is-bump"), 400); }
-    });
-  }
+  const writeBag = () => { storage.set("localStorage", BAG_KEY, JSON.stringify(bag)); updateCount(); };
+  const bagCount = () => bag.reduce((n, i) => n + i.qty, 0);
+  function updateCount() { $$("[data-bag-count]").forEach((el) => { el.textContent = bagCount(); }); }
 
   function addToBag(product, options = {}, qty = 1) {
     if (!product.inStock) return;
@@ -379,240 +331,506 @@
     const line = bag.find((i) => i.key === key);
     if (line) line.qty = Math.min(line.qty + qty, 10);
     else bag.push({ key, id: product.id, options, qty });
-    writeBag(bag);
-    updateBagCount(bag, true);
+    writeBag();
     renderBag();
-    openOverlay($("[data-bag]"));
+    openPanel("bag");
   }
 
   function renderBag() {
     const body = $("[data-bag-body]");
     const foot = $("[data-bag-foot]");
-    const meter = $("[data-shipping-meter]");
+    const meter = $("[data-meter]");
     const subtotal = bag.reduce((s, i) => s + byId(i.id).price * i.qty, 0);
-    const count = bag.reduce((n, i) => n + i.qty, 0);
-    $("[data-bag-items]").textContent = count ? `(${count})` : "";
+    $("[data-bag-items]").textContent = bag.length ? bagCount() : "";
 
     const remaining = CONFIG.freeShippingFrom - subtotal;
-    const pct = Math.min(subtotal / CONFIG.freeShippingFrom, 1);
-    meter.innerHTML = `${remaining > 0
-      ? `Nog <strong>${money(remaining)}</strong> tot gratis verzending.`
-      : `<strong>Gefeliciteerd</strong> — je bestelling wordt gratis verzonden.`}
-      <div class="shipping-meter__bar"><span style="transform:scaleX(${pct})"></span></div>`;
     meter.hidden = !bag.length;
+    meter.innerHTML = `${remaining > 0
+      ? `Nog <strong>${money(remaining)}</strong> tot complimentary shipping.`
+      : `<strong>Complimentary shipping</strong> — je bestelling wordt gratis verzonden.`}
+      <div class="meter__bar"><span style="transform:scaleX(${Math.min(subtotal / CONFIG.freeShippingFrom, 1)})"></span></div>`;
 
     if (!bag.length) {
       body.innerHTML = `<div class="drawer__empty">
-          <div class="ornament">${ICONS.star}</div>
-          <p>Je winkeltas is nog leeg.</p>
-          <a class="btn" href="shop.html">Discover the collection</a>
+          <p class="serif">Your selection<br><em>is still empty</em></p>
+          <p>Ontdek de Forever line en vind jouw signature piece.</p>
+          <a class="pill pill--ink" href="shop.html"><span>Discover the collection</span></a>
         </div>`;
       foot.innerHTML = "";
       return;
     }
     body.innerHTML = bag.map((i) => {
       const p = byId(i.id);
-      const img = p.images[0];
       const opts = Object.entries(i.options).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ");
-      return `<div class="line-item" data-key="${esc(i.key)}">
-          <a class="line-item__media" href="${productUrl(p)}"><img src="${imgPath(img, 600)}" alt="${esc(p.name)}" loading="lazy"></a>
+      return `<div class="line" data-key="${esc(i.key)}">
+          <a class="line__img" href="${productUrl(p)}"><img src="${imgPath(p.images[0], 600)}" alt="${esc(p.name)}" loading="lazy"></a>
           <div>
             <h3><a href="${productUrl(p)}">${esc(p.name)}</a></h3>
-            <p class="line-item__meta">${opts || "One size"}</p>
-            <div class="qty" aria-label="Aantal">
-              <button type="button" data-qty="-1" aria-label="Minder">−</button>
-              <output>${i.qty}</output>
-              <button type="button" data-qty="1" aria-label="Meer">+</button>
+            <p class="line__opt">${opts || "Forever line"}</p>
+            <div class="stepper" aria-label="Aantal">
+              <button type="button" data-qty="-1" aria-label="Minder">−</button><output>${i.qty}</output><button type="button" data-qty="1" aria-label="Meer">+</button>
             </div>
           </div>
-          <div class="line-item__price">
-            ${money(p.price * i.qty)}
-            <div><button class="line-item__remove" type="button" data-remove>Remove</button></div>
-          </div>
+          <div class="line__price">${money(p.price * i.qty)}<div><button class="line__remove" type="button" data-remove>Remove</button></div></div>
         </div>`;
     }).join("");
     foot.innerHTML = `
-      <div class="drawer__row"><span>Subtotal</span><span class="total">${money(subtotal)}</span></div>
+      <div class="drawer__total"><span class="label">Subtotal</span><strong>${money(subtotal)}</strong></div>
       <p class="drawer__note">Inclusief btw. Signature gift box inbegrepen. Verzendkosten worden berekend bij het afrekenen.</p>
-      <button class="btn btn--block" type="button" data-checkout>Checkout</button>
-      <p class="drawer__trust">iDEAL · Bancontact · Klarna</p>`;
+      <button class="pill pill--ink pill--block" type="button" data-checkout><span>Proceed to checkout</span></button>
+      <p class="drawer__pay">iDEAL · Bancontact · Klarna</p>`;
   }
 
   function bindBag() {
-    const drawer = $("[data-bag]");
-    drawer.addEventListener("click", (e) => {
-      const row = e.target.closest("[data-key]");
+    $("[data-panel='bag']").addEventListener("click", (e) => {
       if (e.target.closest("[data-checkout]")) {
         if (CONFIG.checkoutUrl) location.href = CONFIG.checkoutUrl;
         else toast("De checkout is nog niet gekoppeld in deze preview.");
         return;
       }
-      if (!row) return;
-      const line = bag.find((i) => i.key === row.dataset.key);
+      const row = e.target.closest("[data-key]");
+      const line = row && bag.find((i) => i.key === row.dataset.key);
       if (!line) return;
       const q = e.target.closest("[data-qty]");
-      if (q) line.qty = Math.max(0, Math.min(10, line.qty + Number(q.dataset.qty)));
+      if (q) line.qty = clamp(line.qty + Number(q.dataset.qty), 0, 10);
       if (e.target.closest("[data-remove]")) line.qty = 0;
       bag = bag.filter((i) => i.qty > 0);
-      writeBag(bag);
+      writeBag();
       renderBag();
     });
     window.addEventListener("storage", (e) => {
-      if (e.key === BAG_KEY) { bag = readBag(); updateBagCount(); renderBag(); }
+      if (e.key === BAG_KEY) { bag = readBag().filter((i) => byId(i.id)); updateCount(); renderBag(); }
     });
-    updateBagCount();
-  }
-
-  /* ---------- Product cards ---------- */
-  function swatches(p) {
-    const finish = p.options.find((o) => o.name === "Finish");
-    if (!finish) return "";
-    return `<div class="card__swatches" aria-label="Verkrijgbaar in ${finish.values.map(esc).join(" en ")}">
-      ${finish.values.map((v) => `<span class="swatch-dot swatch-dot--${fold(v)}" title="${esc(v)}"></span>`).join("")}
-    </div>`;
-  }
-
-  function cardHTML(p, { compact = false, eager = false } = {}) {
-    const [a, b] = p.images;
-    const loading = eager ? "eager" : "lazy";
-    const sizes = compact ? "200px" : "(max-width: 700px) 50vw, (max-width: 1180px) 33vw, 25vw";
-    const badge = !p.inStock
-      ? `<span class="card__badge card__badge--soldout">Sold out</span>`
-      : p.categories.includes("new-in") && !compact ? `<span class="card__badge">New in</span>` : "";
-    let quick = "";
-    if (p.inStock && !compact) {
-      const multi = p.options.length > 1;
-      const finish = p.options.length === 1 ? p.options[0] : null;
-      if (finish) {
-        quick = `<div class="card__quick"><span class="card__quick-label">Add</span>${finish.values
-          .map((v, i) => `${i ? '<span class="card__quick-sep"></span>' : ""}<button type="button" data-quick="${p.id}" data-option="${esc(finish.name)}" data-value="${esc(v)}">${esc(v)}</button>`)
-          .join("")}</div>`;
-      } else if (multi) {
-        quick = `<a class="card__quick" href="${productUrl(p)}">Choose your finish</a>`;
-      } else {
-        quick = `<button class="card__quick" type="button" data-quick="${p.id}">Add to bag</button>`;
-      }
-    }
-    return `<article class="card">
-      <div class="card__frame">
-        <a class="card__media" href="${productUrl(p)}" aria-label="${esc(p.name)}">
-          ${badge}
-          <img class="fit-${a.fit}" src="${imgPath(a, 600)}" srcset="${srcset(a)}" sizes="${sizes}" alt="${esc(p.name)}" loading="${loading}" width="${a.w}" height="${a.h}">
-          ${b ? `<img class="card__alt fit-${b.fit}" src="${imgPath(b, 600)}" srcset="${srcset(b)}" sizes="${sizes}" alt="" loading="lazy" width="${b.w}" height="${b.h}">` : ""}
-        </a>
-        ${quick}
-      </div>
-      <div class="card__body">
-        <h3 class="card__title"><a href="${productUrl(p)}">${esc(p.name)}</a></h3>
-        <p class="card__price">${p.price ? money(p.price) : "&nbsp;"}</p>
-        ${compact ? "" : swatches(p)}
-      </div>
-    </article>`;
-  }
-
-  function bindQuickAdd(root = document) {
-    root.addEventListener("click", (e) => {
+    document.addEventListener("click", (e) => {
       const btn = e.target.closest("[data-quick]");
       if (!btn) return;
       e.preventDefault();
-      const p = byId(Number(btn.dataset.quick));
-      const opts = btn.dataset.option ? { [btn.dataset.option]: btn.dataset.value } : {};
-      addToBag(p, opts);
+      addToBag(byId(Number(btn.dataset.quick)), btn.dataset.option ? { [btn.dataset.option]: btn.dataset.value } : {});
     });
+    updateCount();
+  }
+
+  /* ---------- Product piece ---------- */
+  function subline(p) {
+    const finish = p.options.find((o) => o.name === "Finish") || p.options[0];
+    if (finish) return finish.values.join(" · ");
+    const cat = ["sets", "necklaces", "bracelets", "earrings"].find((c) => p.categories.includes(c));
+    return cat ? CATEGORIES[cat].singular : "Forever line";
+  }
+
+  function pieceHTML(p, { compact = false, eager = false } = {}) {
+    const [a, b] = p.images;
+    const sizes = compact ? "220px" : "(max-width: 640px) 50vw, (max-width: 1180px) 45vw, 30vw";
+    const flag = !p.inStock
+      ? `<span class="piece__flag piece__flag--out label">Sold out</span>`
+      : p.categories.includes("new-in") ? `<span class="piece__flag label">New</span>` : "";
+    let quick = "";
+    if (p.inStock && !compact) {
+      if (p.options.length === 1) {
+        const o = p.options[0];
+        quick = `<div class="piece__quick"><em>Add</em>${o.values.map((v) => `<button type="button" data-quick="${p.id}" data-option="${esc(o.name)}" data-value="${esc(v)}">${esc(v)}</button>`).join("")}</div>`;
+      } else if (p.options.length > 1) {
+        quick = `<div class="piece__quick"><a href="${productUrl(p)}">Choose your finish</a></div>`;
+      } else {
+        quick = `<div class="piece__quick"><button type="button" data-quick="${p.id}">Add to bag</button></div>`;
+      }
+    }
+    return `<article class="piece">
+      <div class="piece__media">
+        <a class="piece__frame" href="${productUrl(p)}" data-cursor="view" aria-label="${esc(p.name)}">
+          ${flag}
+          <img class="fit-${a.fit}" src="${imgPath(a, 600)}" srcset="${srcset(a)}" sizes="${sizes}" alt="${esc(p.name)}" loading="${eager ? "eager" : "lazy"}" width="${a.w}" height="${a.h}">
+          ${b ? `<img class="piece__alt fit-${b.fit}" src="${imgPath(b, 600)}" srcset="${srcset(b)}" sizes="${sizes}" alt="" loading="lazy" width="${b.w}" height="${b.h}">` : ""}
+        </a>
+        ${quick}
+      </div>
+      <div class="piece__info">
+        <h3 class="piece__name"><a href="${productUrl(p)}">${esc(p.name)}</a></h3>
+        <span class="piece__price">${p.price ? money(p.price) : "—"}</span>
+      </div>
+      <p class="piece__sub">${esc(subline(p))}</p>
+    </article>`;
   }
 
   function listFor(key) {
     const items = CATALOG.slice();
     if (key === "bestsellers") return items.filter((p) => p.bestseller).sort((a, b) => a.bestseller - b.bestseller);
-    if (key === "all" || !key) return items;
+    if (!key || key === "all") return items;
     return items.filter((p) => p.categories.includes(key));
   }
 
-  /* ---------- Rails ---------- */
-  function bindRail(wrap) {
-    const rail = $(".rail", wrap);
-    const bar = $(".rail-progress span", wrap);
-    const step = () => (rail.firstElementChild ? rail.firstElementChild.getBoundingClientRect().width + 28 : 300);
-    $$("[data-rail]", wrap).forEach((b) => b.addEventListener("click", () => rail.scrollBy({ left: Number(b.dataset.rail) * step() })));
-    const update = () => {
-      if (!bar) return;
-      const max = rail.scrollWidth - rail.clientWidth;
-      const visible = rail.clientWidth / rail.scrollWidth;
-      bar.style.width = `${visible * 100}%`;
-      bar.style.transform = `translateX(${max > 0 ? (rail.scrollLeft / max) * ((1 - visible) / visible) * 100 : 0}%)`;
-    };
-    rail.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    update();
-  }
-
-  /* ---------- Reveal on scroll ---------- */
-  function bindReveal() {
-    const els = $$(".reveal:not(.is-visible)");
-    if (!("IntersectionObserver" in window)) { els.forEach((el) => el.classList.add("is-visible")); return; }
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((en) => {
-        if (en.isIntersecting) { en.target.classList.add("is-visible"); io.unobserve(en.target); }
+  /* ---------- Text splitting ---------- */
+  function splitWords(root, cls = "w") {
+    let i = 0;
+    const walk = (node) => {
+      Array.from(node.childNodes).forEach((child) => {
+        if (child.nodeType === 3) {
+          const frag = document.createDocumentFragment();
+          child.textContent.split(/(\s+)/).forEach((part) => {
+            if (!part) return;
+            if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(" ")); return; }
+            const w = document.createElement("span");
+            w.className = cls;
+            if (cls === "w") {
+              const inner = document.createElement("span");
+              inner.textContent = part;
+              inner.style.transitionDelay = `${(i++) * 0.055}s`;
+              w.appendChild(inner);
+            } else {
+              w.textContent = part;
+            }
+            frag.appendChild(w);
+          });
+          node.replaceChild(frag, child);
+        } else if (child.nodeType === 1 && child.tagName !== "BR") {
+          walk(child);
+        }
       });
-    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
-    els.forEach((el) => io.observe(el));
+    };
+    walk(root);
   }
 
-  /* ---------- Pages ---------- */
-  function initHome() {
-    const best = $("[data-products='bestsellers']");
-    if (best) {
-      best.innerHTML = listFor("bestsellers").map((p, i) => cardHTML(p, { eager: i < 4 })).join("");
-      bindRail(best.closest(".rail-wrap"));
+  function bindReveal(root = document) {
+    $$("[data-split]:not([data-split-done])", root).forEach((el) => { splitWords(el); el.setAttribute("data-split-done", ""); });
+    const els = $$("[data-reveal]:not(.is-in), [data-split]:not(.is-in)", root);
+    if (reduceMotion || !("IntersectionObserver" in window)) { els.forEach((el) => el.classList.add("is-in")); return; }
+    // A fully clipped mask counts as invisible to IntersectionObserver, so watch its parent instead.
+    const targets = new Map();
+    els.forEach((el) => {
+      const t = el.dataset.reveal === "mask" ? el.parentElement : el;
+      targets.set(t, [...(targets.get(t) || []), el]);
+    });
+    const io = new IntersectionObserver((entries) => entries.forEach((en) => {
+      if (!en.isIntersecting) return;
+      (targets.get(en.target) || []).forEach((el) => el.classList.add("is-in"));
+      io.unobserve(en.target);
+    }), { rootMargin: "0px 0px -10% 0px", threshold: 0.12 });
+    targets.forEach((_, t) => io.observe(t));
+  }
+
+  /* ---------- Header & scroll engine ---------- */
+  let hdr;
+  const scrollers = [];
+  function bindHeader() {
+    hdr = $("[data-hdr]");
+    let lastY = window.scrollY;
+    scrollers.push(() => {
+      const forced = document.body.dataset.header;
+      const y = window.scrollY;
+      const dy = y - lastY;
+      if (!openKey) {
+        if (y > 160 && dy > 6) hdr.classList.add("is-hidden");
+        else if (dy < -6 || y < 160) hdr.classList.remove("is-hidden");
+      }
+      lastY = y;
+      const filled = forced ? true : y > 40;
+      hdr.classList.toggle("is-filled", filled);
+      hdr.classList.toggle("is-forced", Boolean(forced));
+      document.body.classList.toggle("hdr-visible", !hdr.classList.contains("is-hidden") && y > 40);
+      let theme = forced;
+      if (!theme) {
+        const probe = document.elementFromPoint(window.innerWidth / 2, hdr.offsetHeight + 2);
+        const section = probe && probe.closest("[data-theme]");
+        theme = section ? section.dataset.theme : null;
+      }
+      if (theme) {
+        hdr.classList.toggle("on-light", theme === "light");
+        hdr.classList.toggle("on-dark", theme !== "light");
+      }
+    });
+  }
+
+  function bindParallax() {
+    const els = $$("[data-speed]");
+    if (!els.length || reduceMotion) return;
+    scrollers.push(() => {
+      const vh = window.innerHeight;
+      els.forEach((el) => {
+        const r = el.parentElement.getBoundingClientRect();
+        if (r.bottom < -200 || r.top > vh + 200) return;
+        const offset = (r.top + r.height / 2 - vh / 2) * Number(el.dataset.speed);
+        el.style.transform = `translate3d(0, ${offset.toFixed(1)}px, 0)`;
+      });
+    });
+  }
+
+  let ticking = false;
+  function runScrollers() {
+    ticking = false;
+    scrollers.forEach((fn) => fn());
+  }
+  function requestTick() {
+    if (!ticking) { ticking = true; requestAnimationFrame(runScrollers); }
+  }
+
+  /* ---------- Cursor ---------- */
+  function bindCursor() {
+    if (!finePointer || reduceMotion) return;
+    document.body.insertAdjacentHTML("beforeend", `<div class="cursor is-hidden" aria-hidden="true"><span class="cursor__dot"></span><span class="cursor__ring"><span>View</span></span></div>`);
+    document.body.classList.add("has-cursor");
+    const cursor = $(".cursor");
+    const dot = $(".cursor__dot", cursor);
+    const ring = $(".cursor__ring", cursor);
+    const label = $(".cursor__ring span", cursor);
+    let x = -100, y = -100, rx = -100, ry = -100;
+    window.addEventListener("mousemove", (e) => {
+      x = e.clientX; y = e.clientY;
+      cursor.classList.remove("is-hidden");
+      dot.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    }, { passive: true });
+    document.addEventListener("mouseleave", () => cursor.classList.add("is-hidden"));
+    document.addEventListener("mouseover", (e) => {
+      const view = e.target.closest("[data-cursor]");
+      const link = e.target.closest("a, button, summary, label, select, [role='radio']");
+      cursor.classList.toggle("is-view", Boolean(view));
+      cursor.classList.toggle("is-link", Boolean(link) && !view);
+      if (view) label.textContent = view.dataset.cursorLabel || "View";
+    });
+    const loop = () => {
+      rx += (x - rx) * 0.16;
+      ry += (y - ry) * 0.16;
+      ring.style.transform = `translate3d(${rx.toFixed(1)}px, ${ry.toFixed(1)}px, 0)`;
+      requestAnimationFrame(loop);
+    };
+    loop();
+  }
+
+  /* ---------- Loader & page transitions ---------- */
+  function bindTransitions() {
+    const curtain = $("[data-curtain]");
+    const ready = () => document.body.classList.add("is-ready");
+    const showLoader = page === "home" && !reduceMotion && !storage.get("sessionStorage", LOADER_KEY);
+
+    if (showLoader) {
+      storage.set("sessionStorage", LOADER_KEY, "1");
+      document.body.insertAdjacentHTML("beforeend", `
+        <div class="loader" data-loader aria-hidden="true">
+          <div class="loader__mark">
+            <img src="assets/img/brand/romiere-logo-white.png" alt="">
+            <span class="label">Forever Guided</span>
+          </div>
+        </div>`);
+      curtain.classList.add("is-up");
+      document.body.classList.add("is-locked");
+      setTimeout(() => {
+        $("[data-loader]").classList.add("is-done");
+        document.body.classList.remove("is-locked");
+        setTimeout(ready, 350);
+        setTimeout(() => $("[data-loader]")?.remove(), 1400);
+      }, 2300);
+    } else {
+      requestAnimationFrame(() => requestAnimationFrame(() => { curtain.classList.add("is-up"); setTimeout(ready, 250); }));
     }
-    const fresh = $("[data-products='new-in']");
-    if (fresh) {
-      fresh.innerHTML = listFor("new-in").filter((p) => p.inStock).slice(0, Number(fresh.dataset.limit) || 4)
-        .map((p) => cardHTML(p)).join("");
+
+    window.addEventListener("pageshow", (e) => {
+      if (e.persisted) { curtain.classList.remove("is-armed", "is-closing"); curtain.classList.add("is-up"); ready(); }
+    });
+
+    if (reduceMotion) return;
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest("a[href]");
+      if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      if (a.target === "_blank" || a.hasAttribute("download")) return;
+      const href = a.getAttribute("href");
+      if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) return;
+      const url = new URL(a.href, location.href);
+      if (url.origin !== location.origin) return;
+      if (url.pathname === location.pathname && url.search === location.search && url.hash) return;
+      e.preventDefault();
+      closePanel(true);
+      curtain.classList.remove("is-up");
+      curtain.classList.add("is-armed");
+      void curtain.offsetWidth;
+      curtain.classList.add("is-closing");
+      setTimeout(() => { location.href = url.href; }, 720);
+    });
+  }
+
+  /* ==========================================================================
+     Pages
+     ========================================================================== */
+  function initHome() {
+    // Hero slideshow inside the arch
+    const slides = $$(".hero__arch img");
+    const ticks = $$(".hero__count i");
+    let current = 0;
+    const show = (i) => {
+      slides.forEach((s, k) => s.classList.toggle("is-active", k === i));
+      ticks.forEach((t) => t.classList.remove("is-active"));
+      if (ticks[i]) { void ticks[i].offsetWidth; ticks[i].classList.add("is-active"); }
+    };
+    show(0);
+    if (slides.length > 1 && !reduceMotion) setInterval(() => { current = (current + 1) % slides.length; show(current); }, 6000);
+
+    // Manifesto: words light up as you read
+    const manifesto = $("[data-scrub]");
+    if (manifesto) {
+      splitWords(manifesto, "sw");
+      const words = $$(".sw", manifesto);
+      if (reduceMotion) words.forEach((w) => w.classList.add("is-lit"));
+      else scrollers.push(() => {
+        const r = manifesto.getBoundingClientRect();
+        const vh = window.innerHeight;
+        const p = clamp((vh * 0.85 - r.top) / (r.height + vh * 0.35), 0, 1);
+        const lit = Math.round(p * words.length * 1.1);
+        words.forEach((w, i) => w.classList.toggle("is-lit", i < lit));
+      });
+    }
+
+    // Horizontal collection
+    const hcol = $("[data-hscroll]");
+    if (hcol) {
+      const track = $("[data-track]", hcol);
+      const picks = [...listFor("bestsellers"), ...listFor("new-in")]
+        .filter((p, i, arr) => p.inStock && arr.findIndex((x) => x.id === p.id) === i).slice(0, 10);
+      track.innerHTML = picks.map((p, i) => pieceHTML(p, { eager: i < 3 })).join("") + `
+        <a class="hcol__end" href="shop.html" data-cursor="view" data-cursor-label="Enter">
+          <span><span class="label">Discover all</span><span class="serif">${CATALOG.length} pieces</span></span>
+        </a>`;
+      const bar = $(".hcol__progress span", hcol);
+      const count = $("[data-hcol-count]", hcol);
+      let dist = 0;
+      let active = false;
+      const measure = () => {
+        active = window.innerWidth > 900 && !reduceMotion;
+        if (!active) { hcol.style.height = ""; track.style.transform = ""; return; }
+        dist = Math.max(0, track.scrollWidth - window.innerWidth);
+        hcol.style.height = `${window.innerHeight + dist}px`;
+      };
+      measure();
+      window.addEventListener("resize", measure);
+      window.addEventListener("load", measure);
+      scrollers.push(() => {
+        if (!active) return;
+        const p = clamp(-hcol.getBoundingClientRect().top / (dist || 1), 0, 1);
+        track.style.transform = `translate3d(${(-p * dist).toFixed(1)}px, 0, 0)`;
+        bar.style.transform = `scaleX(${p})`;
+        if (count) count.textContent = `${String(Math.round(p * (picks.length - 1)) + 1).padStart(2, "0")} — ${String(picks.length).padStart(2, "0")}`;
+      });
+    }
+
+    // Meaning chapters
+    const chapters = $("[data-chapters]");
+    if (chapters) {
+      const picks = [[162, "Florea"], [104, "Éclat"], [166, "Amour <em>Rouge</em>"]];
+      chapters.innerHTML = picks.map(([id, title], i) => {
+        const p = byId(id);
+        if (!p) return "";
+        const [a, b] = p.images;
+        return `<article class="chapter${i % 2 ? " chapter--flip" : ""}">
+            <div class="chapter__media">
+              <a class="chapter__arch" href="${productUrl(p)}" data-cursor="view" data-reveal="mask">
+                <img src="${imgPath(a, 1200)}" srcset="${srcset(a)}" sizes="(max-width: 900px) 80vw, 40vw" alt="${esc(p.name)}" loading="lazy">
+              </a>
+              ${b ? `<figure class="chapter__float" data-speed="-0.08"><img src="${imgPath(b, 600)}" alt="" loading="lazy"></figure>` : ""}
+            </div>
+            <div class="chapter__body">
+              <span class="chapter__num label accent" data-reveal>N° ${String(i + 1).padStart(2, "0")} — The meaning</span>
+              <h3 class="display s-xl" data-split>${title}</h3>
+              <p class="quote" data-reveal>“${displayText(p.meaning)}”</p>
+              <div class="chapter__meta" data-reveal><span class="serif">${esc(p.name)}</span><span class="label">${esc(subline(p))}</span><span class="price">${money(p.price)}</span></div>
+              <a class="uline" href="${productUrl(p)}" data-reveal>Discover the piece ${ICONS.arrow}</a>
+            </div>
+          </article>`;
+      }).join("");
+    }
+
+    // Category index with floating preview
+    const index = $("[data-index]");
+    if (index) {
+      $$("[data-count]", index).forEach((el) => { el.textContent = listFor(el.dataset.count).length; });
+      const float = $(".index__float", index);
+      const imgs = $$("img", float);
+      let tx = 0, ty = 0, fx = 0, fy = 0, raf = null;
+      const follow = () => {
+        fx += (tx - fx) * 0.14;
+        fy += (ty - fy) * 0.14;
+        float.style.transform = `translate3d(${fx.toFixed(1)}px, ${fy.toFixed(1)}px, 0)`;
+        raf = Math.abs(tx - fx) + Math.abs(ty - fy) > 0.5 ? requestAnimationFrame(follow) : null;
+      };
+      index.addEventListener("mousemove", (e) => {
+        tx = e.clientX; ty = e.clientY;
+        if (!float.classList.contains("is-on")) { fx = tx; fy = ty; }
+        if (!raf) raf = requestAnimationFrame(follow);
+      });
+      $$(".index__row", index).forEach((row) => {
+        row.addEventListener("mouseenter", () => {
+          imgs.forEach((img) => img.classList.toggle("is-active", img.dataset.img === row.dataset.img));
+          float.classList.add("is-on");
+        });
+        row.addEventListener("mouseleave", () => float.classList.remove("is-on"));
+      });
+    }
+
+    // Ritual steps swap the sticky image
+    const ritual = $("[data-ritual]");
+    if (ritual && "IntersectionObserver" in window) {
+      const steps = $$(".ritual__step", ritual);
+      const frames = $$(".ritual__frame img", ritual);
+      const io = new IntersectionObserver((entries) => entries.forEach((en) => {
+        if (!en.isIntersecting) return;
+        const i = steps.indexOf(en.target);
+        steps.forEach((s, k) => s.classList.toggle("is-active", k === i));
+        frames.forEach((f, k) => f.classList.toggle("is-active", k === i));
+      }), { rootMargin: "-45% 0px -45% 0px" });
+      steps.forEach((s) => io.observe(s));
     }
   }
 
   function initShop() {
     const grid = $("[data-shop-grid]");
-    const chips = $("[data-chips]");
+    const cats = $("[data-cats]");
     const sortSel = $("[data-sort]");
-    const countEl = $("[data-count]");
     let current = CATEGORIES[params.get("c")] ? params.get("c") : "all";
 
-    chips.innerHTML = CATEGORY_ORDER.map((k) => `<button class="chip" type="button" data-cat="${k}" aria-pressed="${k === current}">${esc(CATEGORIES[k].label)}</button>`).join("");
+    cats.innerHTML = CATEGORY_ORDER.map((k, i) => `${i ? '<span aria-hidden="true">/</span>' : ""}<button type="button" data-cat="${k}" aria-pressed="${k === current}">${esc(CATEGORIES[k].label)}</button>`).join("");
+
+    const tiles = [
+      `<a class="editorial-tile" href="story.html" data-cursor="view" data-cursor-label="Story">
+          <img src="${ed("the-edit")}" alt="" loading="lazy">
+          <div class="editorial-tile__body">
+            <p class="label">Forever Guided</p>
+            <p class="quote">Made for confidence, defined by elegance, worn with individuality.</p>
+            <span class="uline">The Romière story ${ICONS.arrow}</span>
+          </div>
+        </a>`,
+      `<a class="editorial-tile" href="story.html#signature-edit" data-cursor="view" data-cursor-label="Story">
+          <img src="${ed("signature-box")}" alt="" loading="lazy">
+          <div class="editorial-tile__body">
+            <p class="label">The signature box</p>
+            <p class="quote">Every piece arrives in our signature gift box. Every detail has a meaning.</p>
+            <span class="uline">Discover the ritual ${ICONS.arrow}</span>
+          </div>
+        </a>`,
+    ];
 
     const render = () => {
       const meta = CATEGORIES[current];
-      $("[data-shop-eyebrow]").textContent = meta.eyebrow;
-      $("[data-shop-title]").textContent = meta.title;
-      $("[data-shop-intro]").textContent = meta.intro;
-      document.title = `${meta.title} — Romière`;
-      $$(".chip", chips).forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.cat === current)));
-
       let items = listFor(current);
       const sort = sortSel.value;
       if (sort === "price-asc") items.sort((a, b) => (a.price ?? 1e9) - (b.price ?? 1e9));
       if (sort === "price-desc") items.sort((a, b) => (b.price ?? -1) - (a.price ?? -1));
       if (sort === "name") items.sort((a, b) => a.name.localeCompare(b.name, "nl"));
       if (sort === "featured") items.sort((a, b) => Number(b.inStock) - Number(a.inStock));
-      countEl.textContent = `${items.length} ${items.length === 1 ? "piece" : "pieces"}`;
+
+      $("[data-shop-eyebrow]").textContent = meta.eyebrow;
+      $("[data-shop-title]").textContent = meta.title;
+      $("[data-shop-sup]").textContent = items.length;
+      $("[data-shop-intro]").textContent = meta.intro;
+      $("[data-shop-count]").textContent = `${items.length} ${items.length === 1 ? "piece" : "pieces"}`;
+      document.title = `${meta.title} — Romière`;
+      $$("[data-cat]", cats).forEach((c) => c.setAttribute("aria-pressed", String(c.dataset.cat === current)));
 
       if (!items.length) { grid.innerHTML = `<p class="shop-empty">Er zijn op dit moment geen sieraden in deze categorie.</p>`; return; }
-      const cards = items.map((p, i) => cardHTML(p, { eager: i < 4 }));
-      if (current === "all" && sort === "featured" && cards.length > 8) {
-        cards.splice(6, 0, `<a class="grid-feature" href="story.html">
-            <img src="assets/img/editorial/ritual-box-1200.webp" alt="" loading="lazy">
-            <div class="grid-feature__text">
-              <p class="eyebrow" style="color:var(--white)">The Romière Story</p>
-              <p class="serif-quote">Wear it now.<br>Remember it forever.<br>Make it yours.</p>
-              <span class="link link--light">Discover our story</span>
-            </div>
-          </a>`);
+      const cards = items.map((p, i) => pieceHTML(p, { eager: i < 3 }));
+      if (current === "all" && sort === "featured") {
+        if (cards.length > 4) cards.splice(4, 0, tiles[0]);
+        if (cards.length > 14) cards.splice(14, 0, tiles[1]);
       }
       grid.innerHTML = cards.join("");
     };
 
-    chips.addEventListener("click", (e) => {
+    cats.addEventListener("click", (e) => {
       const c = e.target.closest("[data-cat]");
       if (!c) return;
       current = c.dataset.cat;
@@ -625,14 +843,13 @@
     render();
   }
 
-  // Lightbox (product page)
-  let lightboxImages = [];
-  let lightboxIndex = 0;
-  function openLightbox(images, index) {
-    lightboxImages = images;
-    lightboxIndex = index;
+  // Lightbox
+  let lbImages = [];
+  let lbIndex = 0;
+  function openLightbox(images, i) {
+    lbImages = images; lbIndex = i;
     const lb = $("[data-lightbox]");
-    $("img", lb).src = imgPath(images[index], 1200);
+    $("img", lb).src = imgPath(images[i], 1200);
     lb.classList.add("is-open");
     document.body.classList.add("is-locked");
   }
@@ -640,11 +857,11 @@
     const lb = $("[data-lightbox]");
     if (!lb || !lb.classList.contains("is-open")) return;
     lb.classList.remove("is-open");
-    if (!openPanel) document.body.classList.remove("is-locked");
+    if (!openKey) document.body.classList.remove("is-locked");
   }
   function stepLightbox(d) {
-    lightboxIndex = (lightboxIndex + d + lightboxImages.length) % lightboxImages.length;
-    $("[data-lightbox] img").src = imgPath(lightboxImages[lightboxIndex], 1200);
+    lbIndex = (lbIndex + d + lbImages.length) % lbImages.length;
+    $("[data-lightbox] img").src = imgPath(lbImages[lbIndex], 1200);
   }
 
   function detailHTML(d) {
@@ -656,161 +873,140 @@
     const root = $("[data-pdp]");
     const p = bySlug(params.get("p"));
     if (!p) {
-      root.innerHTML = `<div class="container" style="text-align:center;padding:120px 0">
-          <p class="eyebrow eyebrow--center">Not found</p>
-          <h1 class="title-lg">Dit sieraad kunnen we niet vinden</h1>
-          <p class="lead" style="margin:20px 0 36px">Misschien is het verplaatst of niet langer beschikbaar.</p>
-          <a class="btn" href="shop.html">Discover the collection</a>
-        </div>`;
+      root.innerHTML = `<section class="notfound t-dark" data-theme="dark">
+          <div>
+            <p class="label accent">Not found</p>
+            <h1 class="display s-lg">Dit sieraad is <em>niet gevonden</em></h1>
+            <a class="pill" href="shop.html"><span>Discover the collection</span></a>
+          </div>
+        </section>`;
+      document.body.removeAttribute("data-header");
       return;
     }
     document.title = `${p.name} — Romière`;
-    const desc = document.querySelector('meta[name="description"]');
-    if (desc) desc.setAttribute("content", (p.tagline || p.intro[0] || "").slice(0, 155));
+    const metaDesc = $('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", (p.tagline || p.intro[0] || "").slice(0, 155));
 
-    const primaryCat = ["sets", "necklaces", "bracelets", "earrings"].find((c) => p.categories.includes(c));
+    const cat = ["sets", "necklaces", "bracelets", "earrings"].find((c) => p.categories.includes(c));
+    const number = String(CATALOG.indexOf(p) + 1).padStart(2, "0");
     const state = {};
     p.options.forEach((o) => { state[o.name] = o.values[0]; });
 
-    const thumbs = p.images.map((img, i) => `<button type="button" data-thumb="${i}" aria-label="Afbeelding ${i + 1}" aria-current="${i === 0}">
-        <img class="fit-${img.fit}" src="${imgPath(img, 600)}" alt="" loading="lazy"></button>`).join("");
-    const slides = p.images.map((img, i) => `<div class="gallery-pdp__slide" data-slide="${i}">
-        <img class="fit-${img.fit}" src="${imgPath(img, 1200)}" srcset="${srcset(img)}" sizes="(max-width: 960px) 100vw, 50vw" alt="${esc(p.name)}${i ? ` — afbeelding ${i + 1}` : ""}" loading="${i < 2 ? "eager" : "lazy"}" width="${img.w}" height="${img.h}">
-      </div>`).join("");
-    const options = p.options.map((o) => `<div class="option" role="radiogroup" aria-label="${esc(o.name)}">
-        <div class="option__label"><span>${esc(o.name)}</span><span data-option-value="${esc(o.name)}">${esc(state[o.name])}</span></div>
-        <div class="option__values">${o.values.map((v) => `<button type="button" class="finish" role="radio" data-opt="${esc(o.name)}" data-val="${esc(v)}" aria-checked="${v === state[o.name]}">
-            <span class="swatch-dot swatch-dot--${fold(v)}"></span>${esc(v)}</button>`).join("")}</div>
+    const options = p.options.map((o) => `<div class="opt" role="radiogroup" aria-label="${esc(o.name)}">
+        <div class="opt__head"><span class="label">${esc(o.name)}</span><span class="serif" data-opt-value="${esc(o.name)}">${esc(state[o.name])}</span></div>
+        <div class="opt__vals">${o.values.map((v) => `<button type="button" class="swatch" role="radio" data-opt="${esc(o.name)}" data-val="${esc(v)}" aria-checked="${v === state[o.name]}"><i class="metal--${fold(v)}"></i>${esc(v)}</button>`).join("")}</div>
       </div>`).join("");
 
     const perks = [
-      [ICONS.truck, "Gratis verzending vanaf €\u00a060 (NL, BE & DE)"],
+      [ICONS.truck, "Complimentary shipping vanaf € 60 (NL, BE & DE)"],
       [ICONS.clock, "Voor 23:00 besteld, morgen verzonden"],
-      [ICONS.gift, "Geleverd in een signature Romière gift box"],
+      [ICONS.gift, "In onze signature gift box"],
       [ICONS.shield, "180 dagen kwaliteitsgarantie"],
     ];
 
     root.innerHTML = `
       <section class="pdp">
-        <div class="container">
-          <nav class="breadcrumbs" aria-label="Kruimelpad">
-            <a href="index.html">Home</a><span aria-hidden="true">/</span>
-            ${primaryCat ? `<a href="shop.html?c=${primaryCat}">${esc(CATEGORIES[primaryCat].label)}</a><span aria-hidden="true">/</span>` : ""}
-            <span>${esc(p.name)}</span>
-          </nav>
-          <div class="pdp__grid">
-            <div>
-              <div class="gallery-pdp">
-                <div class="gallery-pdp__thumbs">${thumbs}</div>
-                <div class="gallery-pdp__main" data-gallery>${slides}</div>
+        <div class="pdp__gallery t-light" data-theme="light" data-gallery>
+          ${p.images.map((img, i) => `<div class="pdp__slide" data-slide="${i}" data-cursor="view" data-cursor-label="Zoom">
+              <img class="fit-${img.fit}" src="${imgPath(img, 1200)}" srcset="${srcset(img)}" sizes="(max-width: 900px) 100vw, 55vw" alt="${esc(p.name)}${i ? ` — afbeelding ${i + 1}` : ""}" loading="${i < 2 ? "eager" : "lazy"}" width="${img.w}" height="${img.h}">
+            </div>`).join("")}
+        </div>
+        <div class="pdp__dots" aria-hidden="true">${p.images.map((_, i) => `<span class="${i ? "" : "is-active"}"></span>`).join("")}</div>
+        <aside class="pdp__panel t-dark" data-theme="dark">
+          <div class="pdp__sticky" data-sticky>
+            <nav class="crumbs label" aria-label="Kruimelpad">
+              <a href="shop.html">Collection</a><span aria-hidden="true">/</span>
+              ${cat ? `<a href="shop.html?c=${cat}">${esc(CATEGORIES[cat].label)}</a>` : ""}
+            </nav>
+            <p class="label accent">N° ${number} — Forever line</p>
+            <h1 class="display pdp__title">${esc(p.name)}</h1>
+            ${p.tagline ? `<p class="pdp__tagline">${displayText(p.tagline)}</p>` : ""}
+            <div class="pdp__price"><span class="serif">${p.price ? money(p.price) : ""}</span>${p.price ? "<small>incl. btw</small>" : ""}</div>
+            ${p.inStock ? options : ""}
+            ${p.inStock
+              ? `<div class="pdp__buy">
+                  <div class="stepper" aria-label="Aantal"><button type="button" data-step="-1" aria-label="Minder">−</button><output data-qty>1</output><button type="button" data-step="1" aria-label="Meer">+</button></div>
+                  <button class="pill pill--solid" type="button" data-add><span>Add to bag</span></button>
+                </div>`
+              : `<button class="pill pill--block" type="button" disabled><span>Sold out</span></button>
+                 <p class="pdp__soldout">Tijdelijk uitverkocht. Volg <a class="text-link" href="${CONFIG.instagram}" target="_blank" rel="noopener">@romiere.official</a> om als eerste te horen wanneer dit piece terug is.</p>`}
+            <ul class="perks">${perks.map(([icon, t]) => `<li>${icon}<span>${esc(t)}</span></li>`).join("")}</ul>
+            <a class="uline" href="#details" style="margin-top:38px;align-self:flex-start">Details &amp; care ${ICONS.down}</a>
+          </div>
+        </aside>
+      </section>
+      <section class="pdp-details t-light" id="details" data-theme="light">
+        <div class="wrap pdp-details__grid">
+          <div>
+            <p class="label accent" data-reveal>The piece</p>
+            ${p.intro.length ? `<p class="pdp-details__lead serif" data-reveal>${displayText(p.intro[0])}</p>` : ""}
+            ${p.intro.slice(1).map((t) => `<p class="body-copy" data-reveal>${esc(t)}</p>`).join("")}
+          </div>
+          <div class="acc" data-reveal data-delay="1">
+            ${p.details.length ? `<details open>
+              <summary class="label">Details &amp; materials</summary>
+              <div class="acc__body"><ul>${p.details.map(detailHTML).join("")}</ul></div>
+            </details>` : ""}
+            <details${p.details.length ? "" : " open"}>
+              <summary class="label">Delivery &amp; returns</summary>
+              <div class="acc__body">
+                <p>Voor 23:00 besteld, de volgende werkdag verzonden. Gratis verzending vanaf €&nbsp;60 naar Nederland, België en Duitsland.</p>
+                <p>Retourneren kan binnen 14 dagen na ontvangst, mits ongedragen, onbeschadigd en in de originele verzegelde verpakking. <a class="text-link" href="contact.html#returns">Retourbeleid</a></p>
               </div>
-              <div class="gallery-pdp__dots" aria-hidden="true">${p.images.map((_, i) => `<span class="${i ? "" : "is-active"}"></span>`).join("")}</div>
-            </div>
-            <div class="pdp__info">
-              <p class="eyebrow eyebrow--rule">Forever line${primaryCat ? ` · ${esc(CATEGORIES[primaryCat].label)}` : ""}</p>
-              <h1 class="pdp__title">${esc(p.name)}</h1>
-              <p class="pdp__price">${p.price ? money(p.price) : ""}${p.price ? "<small>incl. btw</small>" : ""}</p>
-              ${p.tagline ? `<p class="pdp__tagline">${esc(p.tagline)}</p>` : ""}
-              <div class="pdp__divider"></div>
-              ${p.inStock ? options : ""}
-              ${p.inStock
-                ? `<div class="pdp__buy">
-                    <div class="qty" aria-label="Aantal">
-                      <button type="button" data-step="-1" aria-label="Minder">−</button>
-                      <output data-qty-out>1</output>
-                      <button type="button" data-step="1" aria-label="Meer">+</button>
-                    </div>
-                    <button class="btn" type="button" data-add>Add to bag — ${money(p.price)}</button>
-                  </div>`
-                : `<button class="btn btn--block" type="button" disabled>Sold out</button>
-                   <p class="pdp__soldout">Dit sieraad is tijdelijk uitverkocht. Volg <a class="text-link" href="${CONFIG.instagram}" target="_blank" rel="noopener">@romiere.official</a> om als eerste te horen wanneer het terug is.</p>`}
-              <ul class="pdp__perks">${perks.map(([icon, t]) => `<li>${icon}<span>${esc(t)}</span></li>`).join("")}</ul>
-              <div class="accordion">
-                <details open>
-                  <summary>Description</summary>
-                  <div class="accordion__body">${p.intro.map((t) => `<p>${esc(t)}</p>`).join("")}</div>
-                </details>
-                ${p.details.length ? `<details>
-                  <summary>Details &amp; materials</summary>
-                  <div class="accordion__body"><ul>${p.details.map(detailHTML).join("")}</ul></div>
-                </details>` : ""}
-                <details>
-                  <summary>Shipping &amp; returns</summary>
-                  <div class="accordion__body">
-                    <p>Bestellingen die voor 23:00 zijn geplaatst, worden de volgende werkdag verzonden. Gratis verzending vanaf €&nbsp;60 naar Nederland, België en Duitsland.</p>
-                    <p>Retourneren kan binnen 14 dagen na ontvangst, mits ongedragen, onbeschadigd en in de originele verzegelde verpakking. <a class="text-link" href="contact.html#returns">Lees ons retourbeleid</a></p>
-                  </div>
-                </details>
-                <details>
-                  <summary>Care</summary>
-                  <div class="accordion__body">
-                    <p>Bewaar je sieraad in de signature Romière box wanneer je het niet draagt, en poets het voorzichtig met een zachte, droge doek. Fijne kettingen en handjewels zijn delicaat: draag ze met zorg.</p>
-                  </div>
-                </details>
-              </div>
-            </div>
+            </details>
+            <details>
+              <summary class="label">Care</summary>
+              <div class="acc__body"><p>Bewaar je sieraad in de signature Romière box wanneer je het niet draagt en poets het voorzichtig met een zachte, droge doek. Fijne kettingen en handjewels zijn delicaat: draag ze met zorg.</p></div>
+            </details>
           </div>
         </div>
       </section>
-      ${p.meaning ? `<section class="meaning">
-        <div class="container">
-          <p class="eyebrow eyebrow--center">The meaning</p>
-          <div class="ornament" style="margin-bottom:32px">${ICONS.star}</div>
-          <p class="serif-quote reveal">“${esc(p.meaning)}”</p>
-          ${p.closing.length ? `<p class="meaning__closing">${esc(p.closing[0].replace(/[“”"]/g, ""))}</p>` : ""}
-        </div>
-      </section>` : ""}
-      <section class="section">
-        <div class="container">
-          <div class="section-head section-head--split">
-            <div>
-              <p class="eyebrow">Complete the look</p>
-              <h2 class="title-lg">You may <em>also love</em></h2>
-            </div>
-            <a class="link" href="shop.html${primaryCat ? `?c=${primaryCat}` : ""}">View all</a>
+      ${p.meaning ? `<section class="pdp-meaning t-wine" data-theme="dark">
+          <div class="narrow">
+            <p class="label accent" data-reveal>The meaning of ${esc(p.name)}</p>
+            <p class="quote" data-reveal data-delay="1">“${displayText(p.meaning)}”</p>
+            ${p.closing.length ? `<p class="pdp-meaning__closing label" data-reveal data-delay="2">${esc(p.closing[0].replace(/[“”"]/g, ""))}</p>` : ""}
           </div>
-          <div class="product-grid" data-related></div>
+        </section>` : ""}
+      <section class="pdp-more t-light" data-theme="light">
+        <div class="wrap">
+          <div class="section-head">
+            <div>
+              <p class="label accent">Complete the look</p>
+              <h2 class="display s-lg" data-split>You may <em>also love</em></h2>
+            </div>
+            <a class="uline" href="shop.html${cat ? `?c=${cat}` : ""}">View all ${ICONS.arrow}</a>
+          </div>
+          <div class="pieces" data-related></div>
         </div>
       </section>
       <div class="lightbox" data-lightbox role="dialog" aria-label="Afbeelding vergroot">
-        <button class="close-btn" type="button" data-lb-close aria-label="Sluiten">${ICONS.close}</button>
+        <button class="close-x label" type="button" data-lb-close>Close <i aria-hidden="true"></i></button>
         <img src="" alt="${esc(p.name)}">
         <div class="lightbox__nav">
-          <button class="rail-btn" type="button" data-lb="-1" aria-label="Vorige">${ICONS.prev}</button>
-          <button class="rail-btn" type="button" data-lb="1" aria-label="Volgende">${ICONS.next}</button>
+          <button class="round-btn" type="button" data-lb="-1" aria-label="Vorige">${ICONS.prev}</button>
+          <button class="round-btn" type="button" data-lb="1" aria-label="Volgende">${ICONS.next}</button>
         </div>
       </div>`;
 
-    // Related products: same category first, then the rest of the Forever line
     const related = CATALOG.filter((x) => x.id !== p.id && x.inStock)
       .map((x) => ({ x, score: x.categories.filter((c) => p.categories.includes(c) && c !== "forever-line").length * 2 + (x.bestseller ? 1 : 0) }))
       .sort((a, b) => b.score - a.score).slice(0, 4).map(({ x }) => x);
-    $("[data-related]").innerHTML = related.map((x) => cardHTML(x)).join("");
+    $("[data-related]").innerHTML = related.map((x) => pieceHTML(x)).join("");
 
-    // Gallery
+    // Sticky panel only when it fits the viewport
+    const sticky = $("[data-sticky]");
+    const fit = () => sticky.classList.toggle("is-static", sticky.scrollHeight > window.innerHeight);
+    fit();
+    window.addEventListener("resize", fit);
+
+    // Gallery: dots on mobile, lightbox everywhere
     const gallery = $("[data-gallery]");
-    const thumbBtns = $$("[data-thumb]");
-    const dots = $$(".gallery-pdp__dots span");
-    const setActive = (i) => {
-      thumbBtns.forEach((b, k) => b.setAttribute("aria-current", String(k === i)));
-      dots.forEach((d, k) => d.classList.toggle("is-active", k === i));
-    };
-    thumbBtns.forEach((b) => b.addEventListener("click", () => {
-      const i = Number(b.dataset.thumb);
-      const slide = $(`[data-slide="${i}"]`, gallery);
-      setActive(i);
-      if (getComputedStyle(gallery).overflowX === "auto") gallery.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
-      else window.scrollTo({ top: slide.getBoundingClientRect().top + window.scrollY - 120, behavior: "smooth" });
-    }));
+    const dots = $$(".pdp__dots span");
     gallery.addEventListener("scroll", () => {
-      setActive(Math.round(gallery.scrollLeft / gallery.clientWidth));
+      const i = Math.round(gallery.scrollLeft / gallery.clientWidth);
+      dots.forEach((d, k) => d.classList.toggle("is-active", k === i));
     }, { passive: true });
-    if ("IntersectionObserver" in window) {
-      const io = new IntersectionObserver((entries) => entries.forEach((en) => {
-        if (en.isIntersecting && getComputedStyle(gallery).overflowX !== "auto") setActive(Number(en.target.dataset.slide));
-      }), { threshold: 0.6 });
-      $$("[data-slide]", gallery).forEach((s) => io.observe(s));
-    }
     gallery.addEventListener("click", (e) => {
       const s = e.target.closest("[data-slide]");
       if (s) openLightbox(p.images, Number(s.dataset.slide));
@@ -827,20 +1023,19 @@
       if (e.key === "ArrowLeft") stepLightbox(-1);
     });
 
-    // Options, quantity, add to bag
+    // Finish, quantity, add to bag
     let qty = 1;
     root.addEventListener("click", (e) => {
       const opt = e.target.closest("[data-opt]");
       if (opt) {
         state[opt.dataset.opt] = opt.dataset.val;
         $$(`[data-opt="${CSS.escape(opt.dataset.opt)}"]`, root).forEach((b) => b.setAttribute("aria-checked", String(b === opt)));
-        $(`[data-option-value="${CSS.escape(opt.dataset.opt)}"]`, root).textContent = opt.dataset.val;
+        $(`[data-opt-value="${CSS.escape(opt.dataset.opt)}"]`, root).textContent = opt.dataset.val;
       }
       const step = e.target.closest("[data-step]");
       if (step) {
-        qty = Math.max(1, Math.min(10, qty + Number(step.dataset.step)));
-        $("[data-qty-out]", root).textContent = qty;
-        $("[data-add]", root).textContent = `Add to bag — ${money(p.price * qty)}`;
+        qty = clamp(qty + Number(step.dataset.step), 1, 10);
+        $("[data-qty]", root).textContent = qty;
       }
       if (e.target.closest("[data-add]")) addToBag(p, { ...state }, qty);
     });
@@ -861,15 +1056,19 @@
   }
 
   /* ---------- Boot ---------- */
-  renderMasthead();
+  renderChrome();
   renderFooter();
-  bindChrome();
+  bindTransitions();
+  bindOverlays();
   bindBag();
-  bindQuickAdd();
   renderBag();
-  if (page === "home") initHome();
-  if (page === "shop") initShop();
-  if (page === "product") initProduct();
-  if (page === "contact") initContact();
+  bindHeader();
+  const inits = { home: initHome, shop: initShop, product: initProduct, contact: initContact };
+  try { if (inits[page]) inits[page](); } catch (err) { console.error(err); }
+  bindParallax();
   bindReveal();
+  bindCursor();
+  window.addEventListener("scroll", requestTick, { passive: true });
+  window.addEventListener("resize", requestTick);
+  runScrollers();
 })();
