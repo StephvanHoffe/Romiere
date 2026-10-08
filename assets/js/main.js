@@ -86,7 +86,7 @@
   function renderChrome() {
     const html = `
       <a class="skip-link" href="#main">Naar de inhoud</a>
-      <header class="hdr on-dark" data-hdr>
+      <header class="hdr on-light" data-hdr>
         <div class="wrap hdr__inner">
           <div class="hdr__side">
             <button class="hdr__btn" type="button" data-open="menu" aria-label="Open menu">
@@ -109,7 +109,7 @@
       <div class="menu" data-panel="menu" role="dialog" aria-modal="true" aria-label="Menu" aria-hidden="true">
         <div class="menu__inner">
           <div class="menu__top">
-            <img src="assets/img/brand/romiere-logo-white.png" alt="Romière">
+            <img src="assets/img/brand/romiere-logo.png" alt="Romière">
             <button class="close-x label" type="button" data-close>Close <i aria-hidden="true"></i></button>
           </div>
           <nav class="menu__nav" aria-label="Hoofdmenu">
@@ -137,7 +137,7 @@
         </div>
       </div>
 
-      <div class="search t-dark" data-panel="search" role="dialog" aria-modal="true" aria-label="Zoeken" aria-hidden="true">
+      <div class="search t-light" data-panel="search" role="dialog" aria-modal="true" aria-label="Zoeken" aria-hidden="true">
         <div class="wrap">
           <div class="search__top">
             <span class="label accent">Search the collection</span>
@@ -173,7 +173,7 @@
 
   function renderFooter() {
     const html = `
-      <footer class="ftr t-wine" data-theme="dark">
+      <footer class="ftr t-sand" data-theme="light">
         <div class="wrap ftr__top">
           <div class="ftr__news">
             <p class="label accent">Join the Romière community</p>
@@ -224,7 +224,7 @@
           <span>180-day guarantee</span>
           <span>Ordered before 23:00, shipped next day</span>
         </div>
-        <div class="ftr__logo"><img src="assets/img/brand/romiere-logo-white.png" alt="Romière" loading="lazy" data-reveal></div>
+        <div class="ftr__logo"><img src="assets/img/brand/romiere-logo.png" alt="Romière" loading="lazy" data-reveal></div>
         <div class="wrap ftr__bottom">
           <span>© ${new Date().getFullYear()} Romière. All rights reserved.</span>
           <nav aria-label="Betaalmethoden en social">
@@ -358,7 +358,7 @@
       body.innerHTML = `<div class="drawer__empty">
           <p class="serif">Your selection<br><em>is still empty</em></p>
           <p>Ontdek de Forever line en vind jouw signature piece.</p>
-          <a class="pill pill--ink" href="shop.html"><span>Discover the collection</span></a>
+          <a class="pill pill--solid" href="shop.html"><span>Discover the collection</span></a>
         </div>`;
       foot.innerHTML = "";
       return;
@@ -381,7 +381,7 @@
     foot.innerHTML = `
       <div class="drawer__total"><span class="label">Subtotal</span><strong>${money(subtotal)}</strong></div>
       <p class="drawer__note">Inclusief btw. Signature gift box inbegrepen. Verzendkosten worden berekend bij het afrekenen.</p>
-      <button class="pill pill--ink pill--block" type="button" data-checkout><span>Proceed to checkout</span></button>
+      <button class="pill pill--solid pill--block" type="button" data-checkout><span>Proceed to checkout</span></button>
       <p class="drawer__pay">iDEAL · Bancontact · Klarna</p>`;
   }
 
@@ -610,7 +610,7 @@
       document.body.insertAdjacentHTML("beforeend", `
         <div class="loader" data-loader aria-hidden="true">
           <div class="loader__mark">
-            <img src="assets/img/brand/romiere-logo-white.png" alt="">
+            <img src="assets/img/brand/romiere-logo.png" alt="">
             <span class="label">Forever Guided</span>
           </div>
         </div>`);
@@ -658,6 +658,24 @@
      Pages
      ========================================================================== */
   function initHome() {
+    // Continue the hero title inside the arch in ivory, so the words change colour over the photo.
+    const hero = $(".hero");
+    const heroTitle = $(".hero__title");
+    const heroArch = $(".hero__arch");
+    if (hero && heroTitle && heroArch) {
+      const knock = document.createElement("div");
+      knock.className = "hero__knock display s-mega";
+      knock.setAttribute("aria-hidden", "true");
+      knock.innerHTML = heroTitle.innerHTML;
+      heroArch.appendChild(knock);
+      const sync = () => {
+        hero.style.setProperty("--hw", `${hero.clientWidth}px`);
+        hero.style.setProperty("--hh", `${hero.clientHeight}px`);
+      };
+      sync();
+      window.addEventListener("resize", sync);
+    }
+
     // Hero slideshow inside the arch
     const slides = $$(".hero__arch img");
     const ticks = $$(".hero__count i");
@@ -796,7 +814,7 @@
 
     const tiles = [
       `<a class="editorial-tile" href="story.html" data-cursor="view" data-cursor-label="Story">
-          <img src="${ed("the-edit")}" alt="" loading="lazy">
+          <div class="editorial-tile__media"><img src="${ed("the-edit")}" alt="" loading="lazy"></div>
           <div class="editorial-tile__body">
             <p class="label">Forever Guided</p>
             <p class="quote">Made for confidence, defined by elegance, worn with individuality.</p>
@@ -804,7 +822,7 @@
           </div>
         </a>`,
       `<a class="editorial-tile" href="story.html#signature-edit" data-cursor="view" data-cursor-label="Story">
-          <img src="${ed("signature-box")}" alt="" loading="lazy">
+          <div class="editorial-tile__media"><img src="${ed("signature-box")}" alt="" loading="lazy"></div>
           <div class="editorial-tile__body">
             <p class="label">The signature box</p>
             <p class="quote">Every piece arrives in our signature gift box. Every detail has a meaning.</p>
@@ -889,7 +907,7 @@
       if (next && (!p || next.id !== p.id)) location.reload();
     });
     if (!p) {
-      root.innerHTML = `<section class="notfound t-dark" data-theme="dark">
+      root.innerHTML = `<section class="notfound t-light" data-theme="light">
           <div>
             <p class="label accent">Not found</p>
             <h1 class="display s-lg">Dit sieraad is <em>niet gevonden</em></h1>
@@ -928,7 +946,7 @@
             </div>`).join("")}
         </div>
         <div class="pdp__dots" aria-hidden="true">${p.images.map((_, i) => `<span class="${i ? "" : "is-active"}"></span>`).join("")}</div>
-        <aside class="pdp__panel t-dark" data-theme="dark">
+        <aside class="pdp__panel t-white" data-theme="light">
           <div class="pdp__sticky" data-sticky>
             <nav class="crumbs label" aria-label="Kruimelpad">
               <a href="shop.html">Collection</a><span aria-hidden="true">/</span>
@@ -977,7 +995,7 @@
           </div>
         </div>
       </section>
-      ${p.meaning ? `<section class="pdp-meaning t-wine" data-theme="dark">
+      ${p.meaning ? `<section class="pdp-meaning t-sand" data-theme="light">
           <div class="narrow">
             <p class="label accent" data-reveal>The meaning of ${esc(p.name)}</p>
             <p class="quote" data-reveal data-delay="1">“${displayText(p.meaning)}”</p>
